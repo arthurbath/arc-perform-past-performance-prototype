@@ -1282,7 +1282,7 @@
   }
 
   function renderCategoryTab(category, activeCategory) {
-    if (!category.route) {
+    if (!category.route || category.id !== "energy") {
       return '<button class="category-tab disabled" type="button">' + escapeHtml(category.label) + "</button>";
     }
 
