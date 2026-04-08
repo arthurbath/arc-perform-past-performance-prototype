@@ -1,0 +1,128 @@
+- generic [ref=e2]:
+  - generic [ref=e133]:
+    - complementary [ref=e134]:
+      - generic [ref=e135]:
+        - generic [ref=e136]: ARC
+        - navigation [ref=e137]:
+          - button "Home" [ref=e138] [cursor=pointer]:
+            - generic [ref=e140]: Home
+          - button "Projects" [ref=e141] [cursor=pointer]:
+            - generic [ref=e143]: Projects
+          - button "Properties" [ref=e144] [cursor=pointer]:
+            - generic [ref=e146]: Properties
+          - button "Portfolios" [ref=e147] [cursor=pointer]:
+            - generic [ref=e149]: Portfolios
+      - generic [ref=e150]:
+        - generic [ref=e151]: LEED
+        - generic [ref=e152]: PERFORM
+    - main [ref=e153]:
+      - generic [ref=e154]:
+        - generic [ref=e155]:
+          - generic [ref=e156]: Projects / TestOrg101001 / Test Portfolio
+          - heading "Test Portfolio" [level=1] [ref=e157]
+          - generic [ref=e158]: Organization TestOrg101001 | 500032119
+          - generic [ref=e159]:
+            - generic [ref=e160]:
+              - generic [ref=e161]: No. of properties
+              - strong [ref=e162]: "5"
+            - generic [ref=e163]:
+              - generic [ref=e164]: Gross floor area
+              - strong [ref=e165]: 1,000,000 sq ft
+            - generic [ref=e166]:
+              - generic [ref=e167]: Scope
+              - strong [ref=e168]: Portfolio based on location
+            - generic [ref=e169]:
+              - generic [ref=e170]: Asset under management
+              - strong [ref=e171]: $1,000,000 USD
+        - generic [ref=e172]: Management
+      - generic [ref=e173]:
+        - button "Workspace" [ref=e174] [cursor=pointer]
+        - button "Documentation" [ref=e175] [cursor=pointer]
+        - button "Verification" [ref=e176] [cursor=pointer]
+      - generic [ref=e177]:
+        - button "Summary" [ref=e178] [cursor=pointer]
+        - button "Energy" [ref=e179] [cursor=pointer]
+        - button "Emissions" [ref=e180] [cursor=pointer]
+        - button "Water" [ref=e181] [cursor=pointer]
+        - button "Waste" [ref=e182]
+        - button "Health" [ref=e183]
+        - button "Resilience" [ref=e184]
+        - button "Social Impact" [ref=e185]
+        - button "Biodiversity" [ref=e186]
+      - generic [ref=e187]:
+        - generic [ref=e188]:
+          - generic [ref=e189]:
+            - generic [ref=e190]: Emissions metric
+            - paragraph [ref=e191]: Portfolio-wide emissions across the reporting year.
+            - generic [ref=e192]:
+              - button "Total GHG Emissions" [ref=e193] [cursor=pointer]
+              - button "Renewable Energy Use" [ref=e194] [cursor=pointer]
+              - button "Water Use Intensity" [ref=e195] [cursor=pointer]
+          - generic [ref=e196]:
+            - generic [ref=e197]:
+              - generic [ref=e198]: Total GHG Emissions
+              - generic [ref=e199]: Milestones are past performance (12-month period) and can be submitted for verification.
+            - generic [ref=e200]:
+              - button "Track Target" [ref=e201] [cursor=pointer]
+              - button "Verify a Milestone" [ref=e202] [cursor=pointer]
+          - generic [ref=e203]:
+            - generic [ref=e204]:
+              - generic [ref=e205]:
+                - generic [ref=e206]:
+                  - generic [ref=e207]: Target details
+                  - generic [ref=e208]: Create a target later without losing existing milestones.
+                - button "View target details" [ref=e209] [cursor=pointer]
+              - generic [ref=e210]:
+                - generic [ref=e211]:
+                  - generic [ref=e212]: Target name
+                  - strong [ref=e214]: Cut emissions by 2030
+                - generic [ref=e215]:
+                  - generic [ref=e216]: Target value
+                  - strong [ref=e218]: 430 mtCO2e
+                - generic [ref=e219]:
+                  - generic [ref=e220]: Target end date
+                  - strong [ref=e222]: Dec 31, 2030
+                - generic [ref=e223]:
+                  - generic [ref=e224]: Status
+                  - generic [ref=e226]: Ready for Review
+            - generic [ref=e227]:
+              - generic [ref=e229]:
+                - generic [ref=e230]: Milestones
+                - generic [ref=e231]: Milestones can be verified without a target. If you create a target later, these rows become part of that target pathway automatically.
+              - table [ref=e234]:
+                - rowgroup [ref=e235]:
+                  - row "Reporting period Value + UOM Status Actions" [ref=e236]:
+                    - columnheader "Reporting period" [ref=e237]
+                    - columnheader "Value + UOM" [ref=e238]
+                    - columnheader "Status" [ref=e239]
+                    - columnheader "Actions" [ref=e240]
+                - rowgroup [ref=e241]:
+                  - row "Year 2023 452 mtCO2e Ready for Review Request verification View" [ref=e242]:
+                    - cell "Year 2023" [ref=e243]
+                    - cell "452 mtCO2e" [ref=e244]
+                    - cell "Ready for Review" [ref=e245]:
+                      - generic [ref=e246]: Ready for Review
+                    - cell "Request verification View" [ref=e247]:
+                      - generic [ref=e248]:
+                        - button "Request verification" [ref=e249] [cursor=pointer]
+                        - link "View" [ref=e250] [cursor=pointer]:
+                          - /url: "#/metric/emissions-total-ghg"
+                  - row "Year 2022 480 mtCO2e Draft Request verification View" [ref=e251]:
+                    - cell "Year 2022" [ref=e252]
+                    - cell "480 mtCO2e" [ref=e253]
+                    - cell "Draft" [ref=e254]:
+                      - generic [ref=e255]: Draft
+                    - cell "Request verification View" [ref=e256]:
+                      - generic [ref=e257]:
+                        - button "Request verification" [ref=e258] [cursor=pointer]
+                        - link "View" [ref=e259] [cursor=pointer]:
+                          - /url: "#/metric/emissions-total-ghg"
+        - generic [ref=e260]:
+          - generic [ref=e261]: Reference date for the demo is Apr 6, 2026.
+          - button "Reset demo data" [ref=e262] [cursor=pointer]
+  - dialog "Request verification" [ref=e264]:
+    - heading "Request verification" [level=3] [ref=e265]
+    - paragraph [ref=e266]: You’re about to request verification for this milestone. Evidence upload and payment happen in the verification workflow (not shown in this prototype). Continuing will mark Total GHG Emissions Year 2023 as Submitted.
+    - generic [ref=e267]:
+      - button "Cancel" [ref=e268] [cursor=pointer]
+      - button "Continue" [ref=e269] [cursor=pointer]

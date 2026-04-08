@@ -1,0 +1,141 @@
+- generic [ref=e276]:
+  - complementary [ref=e277]:
+    - generic [ref=e278]:
+      - generic [ref=e279]: ARC
+      - navigation [ref=e280]:
+        - button "Home" [ref=e281] [cursor=pointer]:
+          - generic [ref=e283]: Home
+        - button "Projects" [ref=e284] [cursor=pointer]:
+          - generic [ref=e286]: Projects
+        - button "Properties" [ref=e287] [cursor=pointer]:
+          - generic [ref=e289]: Properties
+        - button "Portfolios" [ref=e290] [cursor=pointer]:
+          - generic [ref=e292]: Portfolios
+    - generic [ref=e293]:
+      - generic [ref=e294]: LEED
+      - generic [ref=e295]: PERFORM
+  - main [ref=e296]:
+    - generic [ref=e297]:
+      - generic [ref=e298]:
+        - generic [ref=e299]: Projects / TestOrg101001 / Test Portfolio
+        - heading "Test Portfolio" [level=1] [ref=e300]
+        - generic [ref=e301]: Organization TestOrg101001 | 500032119
+        - generic [ref=e302]:
+          - generic [ref=e303]:
+            - generic [ref=e304]: No. of properties
+            - strong [ref=e305]: "5"
+          - generic [ref=e306]:
+            - generic [ref=e307]: Gross floor area
+            - strong [ref=e308]: 1,000,000 sq ft
+          - generic [ref=e309]:
+            - generic [ref=e310]: Scope
+            - strong [ref=e311]: Portfolio based on location
+          - generic [ref=e312]:
+            - generic [ref=e313]: Asset under management
+            - strong [ref=e314]: $1,000,000 USD
+      - generic [ref=e315]: Management
+    - generic [ref=e316]:
+      - button "Workspace" [ref=e317] [cursor=pointer]
+      - button "Documentation" [ref=e318] [cursor=pointer]
+      - button "Verification" [ref=e319] [cursor=pointer]
+    - generic [ref=e320]:
+      - button "Summary" [ref=e321] [cursor=pointer]
+      - button "Energy" [ref=e322] [cursor=pointer]
+      - button "Emissions" [ref=e323] [cursor=pointer]
+      - button "Water" [ref=e324] [cursor=pointer]
+      - button "Waste" [ref=e325]
+      - button "Health" [ref=e326]
+      - button "Resilience" [ref=e327]
+      - button "Social Impact" [ref=e328]
+      - button "Biodiversity" [ref=e329]
+    - generic [ref=e330]:
+      - paragraph [ref=e331]: View your performance summary for the category's targets.
+      - generic [ref=e332]:
+        - generic [ref=e333]:
+          - heading "Target summary" [level=2] [ref=e334]
+          - generic [ref=e335]: Targets can be added after milestones already exist, and those milestones fold in automatically.
+        - button "Track Target" [ref=e337] [cursor=pointer]
+      - table [ref=e340]:
+        - rowgroup [ref=e341]:
+          - row "Performance metric Target name Target value Target end date Datapoints Status" [ref=e342]:
+            - columnheader "Performance metric" [ref=e343]
+            - columnheader "Target name" [ref=e344]
+            - columnheader "Target value" [ref=e345]
+            - columnheader "Target end date" [ref=e346]
+            - columnheader "Datapoints" [ref=e347]
+            - columnheader "Status" [ref=e348]
+            - columnheader [ref=e349]
+        - rowgroup [ref=e350]:
+          - row "Renewable Energy Use Renewables ramp to 2030 80 % Dec 31, 2030 0 In progress View target" [ref=e351]:
+            - cell "Renewable Energy Use" [ref=e352]:
+              - strong [ref=e353]: Renewable Energy Use
+            - cell "Renewables ramp to 2030" [ref=e354]
+            - cell "80 %" [ref=e355]
+            - cell "Dec 31, 2030" [ref=e356]
+            - cell "0" [ref=e357]
+            - cell "In progress" [ref=e358]:
+              - generic [ref=e359]: In progress
+            - cell "View target" [ref=e360]:
+              - button "View target" [ref=e361] [cursor=pointer]
+          - row "Water Use Intensity Reduce WUI by 2030 24 gal/ft² Dec 31, 2030 3 Submitted View target" [ref=e362]:
+            - cell "Water Use Intensity" [ref=e363]:
+              - strong [ref=e364]: Water Use Intensity
+            - cell "Reduce WUI by 2030" [ref=e365]
+            - cell "24 gal/ft²" [ref=e366]
+            - cell "Dec 31, 2030" [ref=e367]
+            - cell "3" [ref=e368]
+            - cell "Submitted" [ref=e369]:
+              - generic [ref=e370]: Submitted
+            - cell "View target" [ref=e371]:
+              - button "View target" [ref=e372] [cursor=pointer]
+      - generic [ref=e373]:
+        - generic [ref=e374]:
+          - heading "Recent milestones" [level=2] [ref=e375]
+          - generic [ref=e376]: Milestones can be tracked independent of targets and requested for verification when they are ready.
+        - button "Track / Verify Milestone" [ref=e378] [cursor=pointer]
+      - table [ref=e381]:
+        - rowgroup [ref=e382]:
+          - row "Metric Reporting period Value + UOM Status Actions" [ref=e383]:
+            - columnheader "Metric" [ref=e384]
+            - columnheader "Reporting period" [ref=e385]
+            - columnheader "Value + UOM" [ref=e386]
+            - columnheader "Status" [ref=e387]
+            - columnheader "Actions" [ref=e388]
+        - rowgroup [ref=e389]:
+          - row "Total GHG Emissions Year 2023 452 mtCO2e Ready for Review Request verification" [ref=e390]:
+            - cell "Total GHG Emissions" [ref=e391]:
+              - button "Total GHG Emissions" [ref=e392] [cursor=pointer]
+            - cell "Year 2023" [ref=e393]
+            - cell "452 mtCO2e" [ref=e394]
+            - cell "Ready for Review" [ref=e395]:
+              - generic [ref=e396]: Ready for Review
+            - cell "Request verification" [ref=e397]:
+              - button "Request verification" [ref=e399] [cursor=pointer]
+          - row "Water Use Intensity Year 2023 29 gal/ft² Submitted Request verification" [ref=e400]:
+            - cell "Water Use Intensity" [ref=e401]:
+              - button "Water Use Intensity" [ref=e402] [cursor=pointer]
+            - cell "Year 2023" [ref=e403]
+            - cell "29 gal/ft²" [ref=e404]
+            - cell "Submitted" [ref=e405]:
+              - generic [ref=e406]: Submitted
+            - cell "Request verification" [ref=e407]:
+              - button "Request verification" [ref=e409] [cursor=pointer]
+          - row "Total GHG Emissions Year 2022 480 mtCO2e Draft Request verification" [ref=e410]:
+            - cell "Total GHG Emissions" [ref=e411]:
+              - button "Total GHG Emissions" [ref=e412] [cursor=pointer]
+            - cell "Year 2022" [ref=e413]
+            - cell "480 mtCO2e" [ref=e414]
+            - cell "Draft" [ref=e415]:
+              - generic [ref=e416]: Draft
+            - cell "Request verification" [ref=e417]:
+              - button "Request verification" [ref=e419] [cursor=pointer]
+          - row "Water Use Intensity Year 2021 31 gal/ft² Verified Request verification" [ref=e420]:
+            - cell "Water Use Intensity" [ref=e421]:
+              - button "Water Use Intensity" [ref=e422] [cursor=pointer]
+            - cell "Year 2021" [ref=e423]
+            - cell "31 gal/ft²" [ref=e424]
+            - cell "Verified" [ref=e425]:
+              - generic [ref=e426]: Verified
+            - cell "Request verification" [ref=e427]:
+              - button "Request verification" [ref=e429] [cursor=pointer]
+      - button "Reset demo data" [ref=e431] [cursor=pointer]

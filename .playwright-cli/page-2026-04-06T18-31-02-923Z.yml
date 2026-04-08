@@ -1,0 +1,96 @@
+- generic [ref=e165]:
+  - complementary [ref=e166]:
+    - generic [ref=e167]:
+      - generic [ref=e168]: ARC
+      - navigation [ref=e169]:
+        - button "Home" [ref=e170] [cursor=pointer]:
+          - generic [ref=e172]: Home
+        - button "Projects" [ref=e173] [cursor=pointer]:
+          - generic [ref=e175]: Projects
+        - button "Properties" [ref=e176] [cursor=pointer]:
+          - generic [ref=e178]: Properties
+        - button "Portfolios" [ref=e179] [cursor=pointer]:
+          - generic [ref=e181]: Portfolios
+    - generic [ref=e182]:
+      - generic [ref=e183]: LEED
+      - generic [ref=e184]: PERFORM
+  - main [ref=e185]:
+    - generic [ref=e186]:
+      - generic [ref=e187]:
+        - generic [ref=e188]: Projects / TestOrg101001 / Test Portfolio
+        - heading "Test Portfolio" [level=1] [ref=e189]
+        - generic [ref=e190]: Organization TestOrg101001 | 500032119
+        - generic [ref=e191]:
+          - generic [ref=e192]:
+            - generic [ref=e193]: No. of properties
+            - strong [ref=e194]: "5"
+          - generic [ref=e195]:
+            - generic [ref=e196]: Gross floor area
+            - strong [ref=e197]: 1,000,000 sq ft
+          - generic [ref=e198]:
+            - generic [ref=e199]: Scope
+            - strong [ref=e200]: Portfolio based on location
+          - generic [ref=e201]:
+            - generic [ref=e202]: Asset under management
+            - strong [ref=e203]: $1,000,000 USD
+      - generic [ref=e204]: Management
+    - generic [ref=e205]:
+      - button "Workspace" [ref=e206] [cursor=pointer]
+      - button "Documentation" [ref=e207] [cursor=pointer]
+      - button "Verification" [ref=e208] [cursor=pointer]
+    - generic [ref=e209]:
+      - button "Summary" [ref=e210] [cursor=pointer]
+      - button "Energy" [ref=e211] [cursor=pointer]
+      - button "Emissions" [ref=e212] [cursor=pointer]
+      - button "Water" [ref=e213] [cursor=pointer]
+      - button "Waste" [ref=e214]
+      - button "Health" [ref=e215]
+      - button "Resilience" [ref=e216]
+      - button "Social Impact" [ref=e217]
+      - button "Biodiversity" [ref=e218]
+    - generic [ref=e219]:
+      - generic [ref=e220]:
+        - generic [ref=e221]:
+          - generic [ref=e222]: Energy metric
+          - paragraph [ref=e223]: Share of energy supplied through renewable sources.
+          - generic [ref=e224]:
+            - button "Total GHG Emissions" [ref=e225] [cursor=pointer]
+            - button "Renewable Energy Use" [ref=e226] [cursor=pointer]
+            - button "Water Use Intensity" [ref=e227] [cursor=pointer]
+        - generic [ref=e228]:
+          - generic [ref=e229]:
+            - generic [ref=e230]: Renewable Energy Use
+            - generic [ref=e231]: Track a milestone to create the performance record that can move into verification for this metric.
+          - generic [ref=e232]:
+            - button "Track Target" [ref=e233] [cursor=pointer]
+            - button "Track Milestone" [ref=e234] [cursor=pointer]
+        - generic [ref=e235]:
+          - generic [ref=e236]:
+            - generic [ref=e237]:
+              - generic [ref=e238]:
+                - generic [ref=e239]: Target details
+                - generic [ref=e240]: Create a target later without losing existing milestones.
+              - button "View target details" [ref=e241] [cursor=pointer]
+            - generic [ref=e242]:
+              - generic [ref=e243]:
+                - generic [ref=e244]: Target name
+                - strong [ref=e246]: Renewables ramp to 2030
+              - generic [ref=e247]:
+                - generic [ref=e248]: Target value
+                - strong [ref=e250]: 80 %
+              - generic [ref=e251]:
+                - generic [ref=e252]: Target end date
+                - strong [ref=e254]: Dec 31, 2030
+              - generic [ref=e255]:
+                - generic [ref=e256]: Status
+                - generic [ref=e258]: In progress
+          - generic [ref=e259]:
+            - generic [ref=e261]:
+              - generic [ref=e262]: Milestones
+              - generic [ref=e263]: This target has no milestones yet. Tracking a milestone is how this metric moves toward verification.
+            - generic [ref=e265]:
+              - strong [ref=e266]: No milestones yet
+              - text: Track a milestone to create the past performance record you can request for verification.
+      - generic [ref=e267]:
+        - generic [ref=e268]: Reference date for the demo is Apr 6, 2026.
+        - button "Reset demo data" [ref=e269] [cursor=pointer]
