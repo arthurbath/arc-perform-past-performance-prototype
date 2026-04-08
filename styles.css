@@ -442,6 +442,19 @@ td .button-row {
   text-align: left;
 }
 
+.button.inactive-link,
+.inactive-link {
+  cursor: default;
+}
+
+.button.textual.inactive-link {
+  color: var(--text-muted);
+}
+
+.button.primary.inactive-link {
+  opacity: 0.72;
+}
+
 .summary-header,
 .section-header {
   display: flex;
@@ -632,6 +645,11 @@ tbody tr:last-child td {
   gap: 18px;
 }
 
+.drawer-section {
+  display: grid;
+  gap: 12px;
+}
+
 .split-section {
   display: grid;
   gap: 14px;
@@ -677,6 +695,12 @@ tbody tr:last-child td {
   font-size: 26px;
 }
 
+.drawer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .drawer-subtitle {
   color: var(--text-muted);
   font-size: 12px;
@@ -700,6 +724,75 @@ tbody tr:last-child td {
   gap: 18px;
 }
 
+.editor-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.editor-tab {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.editor-tab.active {
+  background: #eef2ff;
+  color: var(--info-text);
+  border-color: #d4dbf7;
+}
+
+.choice-list {
+  display: grid;
+  gap: 12px;
+}
+
+.choice-group {
+  display: grid;
+  gap: 10px;
+}
+
+.choice-group + .choice-group {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.choice-group-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.choice-card {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px 16px;
+  text-align: left;
+  color: var(--text);
+}
+
+.choice-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.choice-card span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .form-section {
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -714,6 +807,14 @@ tbody tr:last-child td {
 
 .form-grid.two-up {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid.three-up {
+  grid-template-columns: 1.2fr 0.9fr 0.9fr;
+}
+
+.form-grid.four-up {
+  grid-template-columns: 0.9fr 1.1fr 0.9fr 0.9fr;
 }
 
 .field {
@@ -745,11 +846,60 @@ tbody tr:last-child td {
   color: var(--text);
 }
 
+.readonly.subtle {
+  color: #91918d;
+}
+
 .helper,
 .field-hint {
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.muted-value {
+  color: var(--text-muted);
+}
+
+.entry-editor-card {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 24px;
+  background: #dbe4fb;
+}
+
+.entry-divider {
+  height: 1px;
+  background: rgba(35, 35, 33, 0.14);
+}
+
+.entry-subsection {
+  display: grid;
+  gap: 12px;
+}
+
+.entry-subsection-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.entry-link {
+  min-height: 44px;
+  border: 1px dashed rgba(35, 35, 33, 0.2);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.entry-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .field-error {
@@ -876,6 +1026,8 @@ tbody tr:last-child td {
   .target-card-grid,
   .kpi-row,
   .form-grid.two-up,
+  .form-grid.three-up,
+  .form-grid.four-up,
   .detail-grid {
     grid-template-columns: 1fr;
   }

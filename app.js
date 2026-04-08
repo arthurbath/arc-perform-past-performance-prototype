@@ -186,6 +186,25 @@
     return startDate;
   }
 
+  function formatDateInputValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
+  }
+
+  function getReportingStartDateInputValue(endDateString) {
+    return endDateString ? formatDateInputValue(getReportingStartDate(endDateString)) : "";
+  }
+
+  function periodsOverlap(leftEndDate, rightEndDate) {
+    const leftStart = getReportingStartDate(leftEndDate).getTime();
+    const leftEnd = new Date(leftEndDate + "T00:00:00").getTime();
+    const rightStart = getReportingStartDate(rightEndDate).getTime();
+    const rightEnd = new Date(rightEndDate + "T00:00:00").getTime();
+    return leftStart <= rightEnd && rightStart <= leftEnd;
+  }
+
   function formatDateValue(date) {
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
@@ -268,8 +287,11 @@
   }
 
   function getTargetEntryName(datapoint, kind) {
+    if (datapoint.name) {
+      return datapoint.name;
+    }
     const year = getYear(datapoint.endDate);
-    return kind === "interim-target" ? "Interim target " + year : "Milestone " + year;
+    return kind === "interim-target" ? "Interim target " + year : "Past performance " + year;
   }
 
   function showToast(message) {
@@ -309,7 +331,7 @@
     }
 
     if (action === "open-add-milestone") {
-      openDatapointDrawer(trigger.dataset.metricId || "", "milestone", trigger.dataset.targetId || "", Boolean(trigger.dataset.metricLocked));
+      openPastPerformanceDrawer(trigger.dataset.metricId || "", trigger.dataset.targetId || "", Boolean(trigger.dataset.metricLocked));
       return;
     }
 
@@ -319,12 +341,17 @@
     }
 
     if (action === "open-create-target") {
-      openTargetDrawer(trigger.dataset.metricId || "", trigger.dataset.targetId || "", getRoute().page === "metric");
+      openTargetDrawer(trigger.dataset.metricId || "", trigger.dataset.targetId || "", getRoute().page === "metric", trigger.dataset.section || "target");
       return;
     }
 
     if (action === "open-target-details") {
       openTargetDetailsDrawer(trigger.dataset.metricId, trigger.dataset.targetId);
+      return;
+    }
+
+    if (action === "edit-target-section") {
+      openTargetDrawer(trigger.dataset.metricId || "", trigger.dataset.targetId || "", true, trigger.dataset.section || "target");
       return;
     }
 
@@ -335,6 +362,21 @@
 
     if (action === "save-datapoint") {
       saveDatapoint();
+      return;
+    }
+
+    if (action === "choose-past-performance-association") {
+      choosePastPerformanceAssociation(trigger.dataset.targetId || "");
+      return;
+    }
+
+    if (action === "choose-past-performance-new-target") {
+      choosePastPerformanceNewTarget();
+      return;
+    }
+
+    if (action === "save-past-performance") {
+      savePastPerformance();
       return;
     }
 
@@ -398,6 +440,14 @@
       return;
     }
 
+    if (action === "set-target-editor-section") {
+      if (ui.drawer && ui.drawer.type === "target") {
+        ui.drawer.activeSection = trigger.dataset.section || "target";
+        render();
+      }
+      return;
+    }
+
     if (action === "reset-demo") {
       resetState();
     }
@@ -419,6 +469,22 @@
           syncDatapointDrawerUom();
         } else if (key === "targetId") {
           syncDatapointDrawerUom();
+        }
+        ui.drawer.errors = {};
+        render();
+        return;
+      }
+
+      if (ui.drawer.type === "past-performance") {
+        ui.drawer.form[key] = value;
+        if (key === "metricId") {
+          ui.drawer.form.targetId = "";
+          ui.drawer.form.name = "";
+          ui.drawer.form.endDate = "";
+          ui.drawer.form.value = "";
+          ui.drawer.form.uom = "";
+          ui.drawer.associationChosen = false;
+          syncPastPerformanceDrawerUom();
         }
         ui.drawer.errors = {};
         render();
@@ -489,6 +555,148 @@
     render();
   }
 
+  function openPastPerformanceDrawer(metricId, targetId, metricLocked) {
+    ui.drawer = {
+      type: "past-performance",
+      metricLocked: Boolean(metricLocked || targetId),
+      associationChosen: Boolean(targetId),
+      form: {
+        metricId: metricId || "",
+        targetId: targetId || "",
+        name: "",
+        endDate: "",
+        value: "",
+        uom: ""
+      },
+      errors: {}
+    };
+    syncPastPerformanceDrawerUom();
+    render();
+  }
+
+  function syncPastPerformanceDrawerUom() {
+    if (!ui.drawer || ui.drawer.type !== "past-performance") {
+      return;
+    }
+
+    const metric = getMetric(ui.drawer.form.metricId);
+    const target = getTarget(ui.drawer.form.metricId, ui.drawer.form.targetId);
+    if (!metric) {
+      ui.drawer.form.uom = "";
+      return;
+    }
+
+    if (target) {
+      ui.drawer.form.uom = target.uom;
+      return;
+    }
+
+    if (!ui.drawer.associationChosen) {
+      ui.drawer.form.uom = "";
+      return;
+    }
+
+    if (!metric.uomOptions.includes(ui.drawer.form.uom)) {
+      ui.drawer.form.uom = metric.uomOptions[0] || "";
+    }
+  }
+
+  function choosePastPerformanceAssociation(targetId) {
+    if (!ui.drawer || ui.drawer.type !== "past-performance") {
+      return;
+    }
+
+    ui.drawer.form.targetId = targetId || "";
+    ui.drawer.associationChosen = true;
+    ui.drawer.errors = {};
+    syncPastPerformanceDrawerUom();
+    render();
+  }
+
+  function choosePastPerformanceNewTarget() {
+    if (!ui.drawer || ui.drawer.type !== "past-performance") {
+      return;
+    }
+
+    openTargetDrawer(ui.drawer.form.metricId, "", Boolean(ui.drawer.form.metricId), "target");
+  }
+
+  function savePastPerformance() {
+    if (!ui.drawer || ui.drawer.type !== "past-performance") {
+      return;
+    }
+
+    const form = ui.drawer.form;
+    const endDate = form.endDate;
+    const value = Number(form.value);
+    const target = getTarget(form.metricId, form.targetId);
+    const resolvedUom = target ? target.uom : form.uom;
+    const errors = {};
+
+    if (!form.metricId) {
+      errors.metricId = "Choose a metric.";
+    }
+    if (form.metricId && !ui.drawer.associationChosen) {
+      errors.targetId = "Choose whether this record belongs to no target, to a new target, or to an existing target.";
+    }
+    if (!form.name || !form.name.trim()) {
+      errors.name = "Enter the past performance name.";
+    }
+    if (!form.endDate) {
+      errors.endDate = "Choose the past performance end date.";
+    }
+    if (!form.value) {
+      errors.value = "Enter the datapoint value.";
+    } else if (Number.isNaN(value)) {
+      errors.value = "Value must be numeric.";
+    }
+    if (!resolvedUom) {
+      errors.uom = "Choose a unit of measure.";
+    }
+
+    if (form.endDate) {
+      const duplicate = getDatapoints(form.metricId).some(function (datapoint) {
+        const sameScope = (datapoint.targetId || null) === (form.targetId || null);
+        const sameUom = datapoint.uom === resolvedUom;
+        return sameScope && sameUom && periodsOverlap(datapoint.endDate, endDate);
+      });
+
+      if (duplicate) {
+        errors.endDate = "This reporting period overlaps an existing past performance record in the same scope.";
+      }
+      if (isFutureEndDate(endDate)) {
+        errors.endDate = "Past performance end dates must be in the past.";
+      }
+    }
+
+    ui.drawer.errors = errors;
+    if (Object.keys(errors).length) {
+      render();
+      return;
+    }
+
+    if (!state.datapointsByMetricId[form.metricId]) {
+      state.datapointsByMetricId[form.metricId] = [];
+    }
+
+    state.datapointsByMetricId[form.metricId].push({
+      id: "dp-" + form.metricId + "-" + Date.now(),
+      metricId: form.metricId,
+      targetId: form.targetId || null,
+      name: form.name.trim(),
+      startDate: getReportingStartDateInputValue(endDate),
+      endDate: endDate,
+      value: value,
+      uom: resolvedUom,
+      status: "Draft"
+    });
+
+    persistState();
+    ui.drawer = null;
+    showToast("Past performance saved.");
+    render();
+  }
+
   function syncDatapointDrawerUom() {
     if (!ui.drawer || ui.drawer.type !== "datapoint") {
       return;
@@ -524,7 +732,8 @@
       datapointId: datapointId,
       editMode: false,
       form: {
-        reportingYear: String(getYear(datapoint.endDate)),
+        name: datapoint.name || "",
+        endDate: datapoint.endDate,
         value: String(datapoint.value),
         uom: datapoint.uom,
         status: datapoint.status
@@ -547,7 +756,8 @@
     ui.drawer.editMode = nextValue;
     ui.drawer.errors = {};
     if (!nextValue) {
-      ui.drawer.form.reportingYear = String(getYear(datapoint.endDate));
+      ui.drawer.form.name = datapoint.name || "";
+      ui.drawer.form.endDate = datapoint.endDate;
       ui.drawer.form.value = String(datapoint.value);
       ui.drawer.form.uom = datapoint.uom;
       ui.drawer.form.status = datapoint.status;
@@ -588,7 +798,7 @@
       errors.uom = "Choose a unit of measure.";
     }
     if (mode === "milestone" && !form.status && !forcedStatus) {
-      errors.status = "Choose the milestone status.";
+      errors.status = "Choose the past performance status.";
     }
 
     if (form.reportingYear) {
@@ -600,7 +810,7 @@
       });
 
       if (duplicate) {
-        errors.reportingYear = "This reporting year already exists for this milestone scope.";
+        errors.reportingYear = "This reporting year already exists for this past performance scope.";
       }
       if (mode === "milestone" && isFutureEndDate(endDate)) {
         errors.reportingYear = "Future-dated entries are interim targets and require a target.";
@@ -632,7 +842,7 @@
 
     persistState();
     ui.drawer = null;
-    showToast(mode === "interim-target" ? "Interim target saved." : "Milestone saved.");
+    showToast(mode === "interim-target" ? "Interim target saved." : "Past performance saved.");
     render();
   }
 
@@ -648,7 +858,7 @@
 
     datapoint.status = ui.drawer.form.status;
     persistState();
-    showToast("Milestone status updated.");
+    showToast("Past performance status updated.");
     render();
   }
 
@@ -663,13 +873,15 @@
     }
 
     const form = ui.drawer.form;
-    const year = Number(form.reportingYear);
-    const endDate = buildEndDateFromYear(year);
+    const endDate = form.endDate;
     const value = Number(form.value);
     const errors = {};
 
-    if (!form.reportingYear) {
-      errors.reportingYear = "Choose the reporting year.";
+    if (!form.name || !form.name.trim()) {
+      errors.name = "Enter the past performance name.";
+    }
+    if (!form.endDate) {
+      errors.endDate = "Choose the past performance end date.";
     }
     if (!form.value) {
       errors.value = "Enter the datapoint value.";
@@ -677,22 +889,21 @@
       errors.value = "Value must be numeric.";
     }
 
-    if (form.reportingYear) {
+    if (form.endDate) {
       const duplicate = getDatapoints(ui.drawer.metricId).some(function (entry) {
         if (entry.id === ui.drawer.datapointId) {
           return false;
         }
         const sameScope = (entry.targetId || null) === (datapoint.targetId || null);
-        const sameYear = getYear(entry.endDate) === year;
         const sameUom = entry.uom === datapoint.uom;
-        return sameScope && sameYear && sameUom;
+        return sameScope && sameUom && periodsOverlap(entry.endDate, endDate);
       });
 
       if (duplicate) {
-        errors.reportingYear = "This reporting year already exists for this milestone scope.";
+        errors.endDate = "This reporting period overlaps an existing past performance record in the same scope.";
       }
       if (isFutureEndDate(endDate)) {
-        errors.reportingYear = "Future-dated entries are interim targets and require a target.";
+        errors.endDate = "Past performance end dates must be in the past.";
       }
     }
 
@@ -702,19 +913,22 @@
       return;
     }
 
+    datapoint.name = form.name.trim();
+    datapoint.startDate = getReportingStartDateInputValue(endDate);
     datapoint.endDate = endDate;
     datapoint.value = value;
     datapoint.status = form.status;
     persistState();
     ui.drawer.editMode = false;
-    showToast("Milestone updated.");
+    showToast("Past performance updated.");
     render();
   }
 
-  function openTargetDrawer(metricId, targetId, metricLocked) {
+  function openTargetDrawer(metricId, targetId, metricLocked, activeSection) {
     ui.drawer = {
       type: "target",
       metricLocked: Boolean(metricLocked || targetId),
+      activeSection: activeSection || "target",
       form: {
         metricId: metricId || "",
         targetId: targetId || "",
@@ -867,7 +1081,7 @@
         errors.reportingYear = "This reporting year already exists on the target pathway.";
       }
       if (editor.mode === "milestone" && isFutureEndDate(endDate)) {
-        errors.reportingYear = "Milestones added here must use a past reporting year.";
+        errors.reportingYear = "Past performance added here must use a past reporting year.";
       }
       if (editor.mode === "interim-target" && !isFutureEndDate(endDate)) {
         errors.reportingYear = "Interim targets added here must use a future reporting year.";
@@ -1084,21 +1298,21 @@
 
     return [
       '<p class="lead-text">View your performance summary for the category\'s targets.</p>',
-      '<div class="summary-header"><div><h2 class="section-title">Target summary</h2><div class="section-description">Metrics can carry multiple targets, while milestones can remain independent of those targets.</div></div><div class="button-row"><button class="button primary" type="button" data-action="open-create-target">Track Target</button></div></div>',
+      '<div class="summary-header"><div><h2 class="section-title">Target summary</h2><div class="section-description">Metrics can carry multiple targets, while past performance can remain independent of those targets.</div></div><div class="button-row"><button class="button primary" type="button" data-action="open-create-target">Track Target</button></div></div>',
       renderTargetSummaryTable(targetRows),
-      '<div class="section-header"><div><h2 class="section-title">Recent milestones</h2><div class="section-description">Milestones can be tracked independent of targets and requested for verification when they are ready.</div></div><div class="button-row"><button class="button" type="button" data-action="open-add-milestone">Track / Verify Milestone</button></div></div>',
+      '<div class="section-header"><div><h2 class="section-title">Recent past performance</h2><div class="section-description">Past performance can be tracked independent of targets and requested for verification when ready.</div></div><div class="button-row"><button class="button" type="button" data-action="open-add-milestone">Track past performance</button></div></div>',
       renderRecentMilestonesTable(getAllPastMilestones())
     ].join("");
   }
 
   function renderTargetSummaryTable(targetRows) {
     if (!targetRows.length) {
-      return '<div class="table-shell"><div class="empty-state"><strong>No targets yet</strong>Create one or more targets from summary or from a metric page. Milestones can remain separate.</div></div>';
+      return '<div class="table-shell"><div class="empty-state"><strong>No targets yet</strong>Create one or more targets from summary or from a metric page. Past performance can remain separate.</div></div>';
     }
 
     return [
       '<div class="table-shell"><div class="table-scroll"><table>',
-      "<thead><tr><th>Performance metric</th><th>Target name</th><th>Target end date</th><th>Target value</th><th>Milestones</th><th>Interim targets</th><th>Status</th></tr></thead>",
+      "<thead><tr><th>Performance metric</th><th>Target name</th><th>Target end date</th><th>Target value</th><th>Past performance</th><th>Interim targets</th><th>Status</th></tr></thead>",
       "<tbody>",
       targetRows.map(function (row) {
         const milestones = getPastDatapoints(row.metric.id, row.target.id);
@@ -1121,7 +1335,7 @@
 
   function renderRecentMilestonesTable(rows) {
     if (!rows.length) {
-      return '<div class="table-shell"><div class="empty-state"><strong>No milestones yet</strong>Start by tracking a past performance year, then request verification from here or from the metric page.<div class="button-row" style="justify-content:center; margin-top:14px;"><button class="button primary" type="button" data-action="open-add-milestone">Track / Verify Milestone</button></div></div></div>';
+      return '<div class="table-shell"><div class="empty-state"><strong>No past performance yet</strong>Start by tracking a past performance year, then request verification from here or from the metric page.<div class="button-row" style="justify-content:center; margin-top:14px;"><button class="button primary" type="button" data-action="open-add-milestone">Track past performance</button></div></div></div>';
     }
 
     return renderDatapointTable(rows[0].metric, rows.map(function (row) {
@@ -1153,8 +1367,8 @@
       }).join("") + "</div>",
       "  </div>",
       '  <div class="stack">',
-      '    <section class="panel"><div class="panel-header"><div><div class="panel-title">Targets</div></div><button class="button small" type="button" data-action="open-create-target" data-metric-id="' + escapeHtml(metric.id) + '">Track Target</button></div>' + renderTargetList(metric) + "</section>",
-      '    <section class="panel"><div class="panel-header"><div><div class="panel-title">Milestones</div></div><button class="button small" type="button" data-action="open-add-milestone" data-metric-id="' + escapeHtml(metric.id) + '">Track / Verify Milestone</button></div>' + renderDatapointTable(metric, getPastDatapoints(metric.id), { mode: "metric" }) + "</section>",
+      '    <section class="panel"><div class="panel-header"><div><div class="panel-title">Targets</div></div><button class="button small" type="button" data-action="open-create-target" data-metric-id="' + escapeHtml(metric.id) + '">Create new target</button></div>' + renderTargetList(metric) + "</section>",
+      '    <section class="panel"><div class="panel-header"><div><div class="panel-title">Past performance</div></div><button class="button small" type="button" data-action="open-add-milestone" data-metric-id="' + escapeHtml(metric.id) + '">Track past performance</button></div>' + renderDatapointTable(metric, getPastDatapoints(metric.id), { mode: "metric" }) + "</section>",
       "  </div>",
       "</div>"
     ].join("");
@@ -1163,12 +1377,12 @@
   function renderTargetList(metric) {
     const targets = getTargets(metric.id);
     if (!targets.length) {
-      return '<div class="table-shell"><div class="empty-state"><strong>No targets yet</strong>This metric can still collect milestones while you decide whether to add one or several targets.</div></div>';
+      return '<div class="table-shell"><div class="empty-state"><strong>No targets yet</strong>This metric can still collect past performance while you decide whether to add one or several targets.</div></div>';
     }
 
     return [
       '<div class="table-shell"><div class="table-scroll"><table>',
-      "<thead><tr><th>Target name</th><th>Target end date</th><th>Target value</th><th>Milestones</th><th>Interim targets</th><th>Status</th></tr></thead>",
+      "<thead><tr><th>Target name</th><th>Target end date</th><th>Target value</th><th>Past performance</th><th>Interim targets</th><th>Status</th></tr></thead>",
       "<tbody>",
       targets.map(function (target) {
         return [
@@ -1189,18 +1403,19 @@
   function renderDatapointTable(metric, datapoints, options) {
     const mode = options.mode;
     if (!datapoints.length) {
-      return '<div class="table-shell"><div class="empty-state"><strong>No milestones recorded</strong>' + (mode === "metric" ? "Track a milestone now, even if it is not associated with a target." : "Start by tracking a past performance year.") + "</div></div>";
+      return '<div class="table-shell"><div class="empty-state"><strong>No past performance recorded</strong>' + (mode === "metric" ? "Track past performance now, even if it is not associated with a target." : "Start by tracking a past performance year.") + "</div></div>";
     }
 
     const showMetricColumn = mode === "summary";
-    const showTargetColumn = true;
+    const showNameColumn = mode === "metric";
     const metricByDatapointId = options.metricByDatapointId || {};
 
     return [
       '<div class="table-shell"><div class="table-scroll"><table>',
       "<thead><tr>",
       showMetricColumn ? "<th>Metric</th>" : "",
-      "<th>Reporting period</th><th>Target</th><th>Value</th><th>Status</th><th>Actions</th>",
+      showNameColumn ? "<th>Name</th>" : "<th>Reporting period</th>",
+      "<th>Target</th><th>" + (mode === "metric" ? "End date" : "Reporting period") + "</th><th>Value</th><th>Status</th><th>Actions</th>",
       "</tr></thead>",
       "<tbody>",
       datapoints.map(function (datapoint) {
@@ -1210,11 +1425,12 @@
           showMetricColumn
             ? '<td><button class="button textual" type="button" data-action="open-milestone-details" data-metric-id="' + escapeHtml(rowMetric.id) + '" data-datapoint-id="' + escapeHtml(datapoint.id) + '">' + escapeHtml(rowMetric.name) + "</button></td>"
             : "",
-          '<td><button class="button textual" type="button" data-action="open-milestone-details" data-metric-id="' + escapeHtml(rowMetric.id) + '" data-datapoint-id="' + escapeHtml(datapoint.id) + '">' + escapeHtml(formatPeriod(datapoint.endDate)) + "</button></td>",
+          '<td><button class="button textual" type="button" data-action="open-milestone-details" data-metric-id="' + escapeHtml(rowMetric.id) + '" data-datapoint-id="' + escapeHtml(datapoint.id) + '">' + escapeHtml(showNameColumn ? getTargetEntryName(datapoint, "milestone") : getReportingRangeLabel(datapoint.endDate)) + "</button></td>",
           "<td>" + renderAssociationCell(rowMetric.id, datapoint) + "</td>",
+          "<td>" + (mode === "metric" ? formatDate(datapoint.endDate) : getReportingRangeLabel(datapoint.endDate)) + "</td>",
           '<td class="mono">' + formatValue(datapoint.value) + " " + escapeHtml(datapoint.uom) + "</td>",
           "<td>" + renderChip(datapoint.status) + "</td>",
-          '<td><div class="button-row"><button class="button textual" type="button" data-action="request-verification" data-metric-id="' + escapeHtml(rowMetric.id) + '" data-datapoint-id="' + escapeHtml(datapoint.id) + '">Request verification</button></div></td>',
+          '<td><div class="button-row"><span class="button textual inactive-link">Request verification</span></div></td>',
           "</tr>"
         ].join("");
       }).join(""),
@@ -1226,7 +1442,7 @@
     if (datapoint.targetId) {
       return escapeHtml(getAssociatedTargetLabel(metricId, datapoint.targetId));
     }
-    return "<div>Not associated</div><div class=\"helper\">This milestone stands on its own.</div>";
+    return '<span class="muted-value">Not associated</span>';
   }
 
   function renderDrawer() {
@@ -1236,6 +1452,9 @@
 
     if (ui.drawer.type === "datapoint") {
       return renderDatapointDrawer();
+    }
+    if (ui.drawer.type === "past-performance") {
+      return renderPastPerformanceDrawer();
     }
     if (ui.drawer.type === "milestone-details") {
       return renderMilestoneDetailsDrawer();
@@ -1256,7 +1475,7 @@
     const target = getTarget(form.metricId, form.targetId);
     const availableTargets = form.metricId ? getTargets(form.metricId) : [];
     const scopeDatapoints = form.metricId ? (form.targetId ? getDatapointsForTarget(form.metricId, form.targetId) : getHeadlessDatapoints(form.metricId)) : [];
-    const title = mode === "interim-target" ? "Add Interim Target" : "Track / Verify Milestone";
+    const title = mode === "interim-target" ? "Add Interim Target" : "Track past performance";
     const subtitle = mode === "interim-target"
       ? "Add a future reporting period on one target pathway."
       : "Track a past reporting period here. It can remain independent of any target.";
@@ -1284,7 +1503,7 @@
         ? '<div class="notice warning">Interim targets must use a future reporting year.</div>'
         : "",
       mode === "milestone" && !form.targetId && form.metricId
-        ? '<div class="notice info">This milestone will remain not associated with any target.</div>'
+        ? '<div class="notice info">This past performance entry will remain not associated with any target.</div>'
         : "",
       scopeDatapoints.length
         ? '<div class="notice info">Existing recorded years in this scope: ' + scopeDatapoints.map(function (datapoint) {
@@ -1294,9 +1513,93 @@
       "    </div></section>",
       '    <div class="drawer-actions"><button class="button ghost" type="button" data-action="close-drawer">Cancel</button>',
       mode === "milestone" ? '<button class="button" type="button" data-action="save-datapoint-ready">Save &amp; mark Ready for Review</button>' : "",
-      '<button class="button primary" type="button" data-action="save-datapoint">' + (mode === "interim-target" ? "Save interim target" : "Save milestone") + "</button></div>",
+      '<button class="button primary" type="button" data-action="save-datapoint">' + (mode === "interim-target" ? "Save interim target" : "Save past performance") + "</button></div>",
       "  </div>",
       "</aside>"
+    ].join("");
+  }
+
+  function renderPastPerformanceDrawer() {
+    const form = ui.drawer.form;
+    const metric = getMetric(form.metricId);
+    const target = getTarget(form.metricId, form.targetId);
+    const targets = metric ? getTargets(metric.id) : [];
+    const needsMetric = !form.metricId;
+    const needsAssociation = metric && !ui.drawer.associationChosen;
+    const scopeDatapoints = metric ? (form.targetId ? getDatapointsForTarget(metric.id, form.targetId) : getHeadlessDatapoints(metric.id)) : [];
+    const subtitle = metric
+      ? "Performance metric: " + metric.name + " | Target: " + (target ? target.name : "Not associated")
+      : "Choose the performance metric you want to record.";
+
+    return [
+      '<div class="drawer-backdrop" data-action="close-drawer"></div>',
+      '<aside class="drawer" aria-label="Track past performance drawer">',
+      '  <div class="drawer-header"><div><h2 class="drawer-title">Track past performance</h2><div class="drawer-subtitle">' + escapeHtml(subtitle) + '</div></div><button class="drawer-close" type="button" data-action="close-drawer">×</button></div>',
+      '  <div class="drawer-body">',
+      needsMetric ? renderPastPerformanceMetricSelection() : "",
+      needsAssociation ? renderPastPerformanceAssociationSelection(metric, targets) : "",
+      metric && ui.drawer.associationChosen ? renderPastPerformanceEntrySection(metric, target, !ui.drawer.metricLocked, scopeDatapoints) : "",
+      !metric || !ui.drawer.associationChosen ? '    <div class="drawer-actions"><button class="button ghost" type="button" data-action="close-drawer">Cancel</button></div>' : "",
+      "  </div>",
+      "</aside>"
+    ].join("");
+  }
+
+  function renderPastPerformanceMetricSelection() {
+    return [
+      '<section class="form-section">',
+      '  <div class="panel-header"><div><div class="panel-title">Performance metric</div><div class="panel-subtitle">Choose the metric you want to record past performance for.</div></div></div>',
+      '  <div class="form-grid">',
+      '    <div class="field"><label for="past-performance-metric">Metric</label><select id="past-performance-metric" data-drawer-field="metricId"><option value="">Select metric</option>' + state.metrics.map(function (item) {
+        return '<option value="' + escapeHtml(item.id) + '" ' + (item.id === ui.drawer.form.metricId ? "selected" : "") + ">" + escapeHtml(item.name) + "</option>";
+      }).join("") + '</select>' + (ui.drawer.errors.metricId ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.metricId) + "</div>" : "") + "</div>",
+      "  </div>",
+      "</section>"
+    ].join("");
+  }
+
+  function renderPastPerformanceAssociationSelection(metric, targets) {
+    return [
+      '<section class="form-section">',
+      '  <div class="panel-header"><div><div class="panel-title">Target association</div><div class="panel-subtitle">Choose whether this past performance entry stands on its own, starts a new target, or belongs to an existing target.</div></div></div>',
+      ui.drawer.errors.targetId ? '<div class="field-error" style="margin-bottom:12px;">' + escapeHtml(ui.drawer.errors.targetId) + "</div>" : "",
+      '  <div class="choice-group"><div class="choice-group-label">Start here</div><div class="choice-list">',
+      '    <button class="choice-card" type="button" data-action="choose-past-performance-association" data-target-id=""><strong>No target</strong><span>Track past performance that is not associated with any target. You can choose any allowed unit for ' + escapeHtml(metric.shortLabel) + ".</span></button>",
+      '    <button class="choice-card" type="button" data-action="choose-past-performance-new-target"><strong>New target</strong><span>Close this drawer and open the new target flow for ' + escapeHtml(metric.shortLabel) + ".</span></button>",
+      '  </div></div>',
+      targets.length ? '<div class="choice-group"><div class="choice-group-label">Existing targets</div><div class="choice-list">' + targets.map(function (target) {
+        return '<button class="choice-card" type="button" data-action="choose-past-performance-association" data-target-id="' + escapeHtml(target.id) + '"><strong>' + escapeHtml(target.name) + '</strong><span>Pin this record to the existing target. Unit of measure will be locked to ' + escapeHtml(target.uom) + ".</span></button>";
+      }).join("") + "</div></div>" : "",
+      "</section>"
+    ].join("");
+  }
+
+  function renderPastPerformanceEntrySection(metric, target, showAssociationChange, scopeDatapoints) {
+    const form = ui.drawer.form;
+    const resolvedStartDate = form.endDate ? getReportingStartDateInputValue(form.endDate) : "";
+
+    return [
+      '<section class="form-section">',
+      '  <div class="panel-header"><div><div class="panel-title">Past performance</div><div class="panel-subtitle">' + escapeHtml(target ? "Add a past reporting period on this target pathway." : "Add a past reporting period that stands on its own.") + "</div></div></div>",
+      '  <div class="entry-editor-card"><div class="form-grid">',
+      '<div class="field"><label for="past-performance-name">Past performance name*</label><input id="past-performance-name" type="text" placeholder="Name" data-drawer-field="name" value="' + escapeHtml(form.name) + '" />' + (ui.drawer.errors.name ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.name) + "</div>" : "") + "</div>",
+      [
+        '<div class="form-grid four-up">',
+        !target
+          ? '<div class="field"><label for="past-performance-uom">Unit of measure</label><select id="past-performance-uom" data-drawer-field="uom">' + metric.uomOptions.map(function (option) {
+              return '<option value="' + escapeHtml(option) + '" ' + (option === form.uom ? "selected" : "") + ">" + escapeHtml(option) + "</option>";
+            }).join("") + '</select>' + (ui.drawer.errors.uom ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.uom) + "</div>" : "") + "</div>"
+          : '<div class="field"><label>Unit of measure</label><div class="readonly">' + escapeHtml(target.uom) + "</div></div>",
+        '<div class="field"><label for="past-performance-value">Past performance value*</label><input id="past-performance-value" type="number" step="any" placeholder="00" data-drawer-field="value" value="' + escapeHtml(form.value) + '" />' + (ui.drawer.errors.value ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.value) + "</div>" : "") + "</div>",
+        '<div class="field"><label>Past performance start date</label><div class="readonly subtle">' + (resolvedStartDate ? formatDate(resolvedStartDate) : "MM/DD/YYYY") + "</div></div>",
+        '<div class="field"><label for="past-performance-end-date">Past performance end date*</label><input id="past-performance-end-date" type="date" data-drawer-field="endDate" value="' + escapeHtml(form.endDate) + '" />' + (ui.drawer.errors.endDate ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.endDate) + "</div>" : "") + "</div>",
+        "</div>"
+      ].join(""),
+      '<div class="entry-divider"></div>',
+      '<div class="entry-subsection"><div class="entry-subsection-title">Financial details (optional)</div><button class="entry-link" type="button">Add financial details</button></div>',
+      '<div class="entry-actions"><button class="button ghost" type="button" data-action="close-drawer">Cancel</button><button class="button primary" type="button" data-action="save-past-performance">Save</button></div>',
+      "</div></div>",
+      "</section>"
     ].join("");
   }
 
@@ -1329,7 +1632,7 @@
             const label = item.id ? item.name + " (" + item.uom + ")" : item.name;
             return '<option value="' + escapeHtml(item.id) + '" ' + (item.id === form.targetId ? "selected" : "") + ">" + escapeHtml(label) + "</option>";
           }).join("") + "</select>",
-      '<div class="field-hint">' + escapeHtml(isInterimTarget ? "Interim targets must belong to one target pathway." : "Leave blank to keep this milestone independent.") + "</div>",
+      '<div class="field-hint">' + escapeHtml(isInterimTarget ? "Interim targets must belong to one target pathway." : "Leave blank to keep this past performance entry independent.") + "</div>",
       ui.drawer.errors.targetId ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.targetId) + "</div>" : "",
       "</div>"
     ].join("");
@@ -1339,7 +1642,7 @@
     return [
       '<div class="field"><label for="datapoint-year">Reporting year</label>',
       '<select id="datapoint-year" data-drawer-field="reportingYear"><option value="">Select year</option>' + renderYearOptions(selectedYear, mode) + "</select>",
-      '<div class="field-hint">' + escapeHtml(mode === "interim-target" ? "Interim targets are future 12-month periods; start date is implied." : "Milestones are 12-month periods; start date is implied.") + "</div>",
+      '<div class="field-hint">' + escapeHtml(mode === "interim-target" ? "Interim targets are future 12-month periods; start date is implied." : "Past performance entries are 12-month periods; start date is implied.") + "</div>",
       ui.drawer.errors.reportingYear ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.reportingYear) + "</div>" : "",
       "</div>"
     ].join("");
@@ -1392,15 +1695,15 @@
 
     const target = datapoint.targetId ? getTarget(ui.drawer.metricId, datapoint.targetId) : null;
     const form = ui.drawer.form;
-    const reportingEndDate = buildEndDateFromYear(form.reportingYear || getYear(datapoint.endDate));
+    const reportingEndDate = form.endDate || datapoint.endDate;
 
     return [
       '<div class="drawer-backdrop" data-action="close-drawer"></div>',
-      '<aside class="drawer" aria-label="Milestone details drawer">',
-      '  <div class="drawer-header"><div><h2 class="drawer-title">Milestone details</h2><div class="drawer-subtitle">Category: ' + escapeHtml(metric.categoryLabel) + " | Performance metric: " + escapeHtml(metric.name) + '</div></div><button class="drawer-close" type="button" data-action="close-drawer">×</button></div>',
+      '<aside class="drawer" aria-label="Past performance details drawer">',
+      '  <div class="drawer-header"><div><h2 class="drawer-title">Past performance details</h2><div class="drawer-subtitle">Category: ' + escapeHtml(metric.categoryLabel) + " | Performance metric: " + escapeHtml(metric.name) + '</div></div><button class="drawer-close" type="button" data-action="close-drawer">×</button></div>',
       '  <div class="drawer-body">',
       '    <section class="form-section">',
-      '      <div class="panel-header"><div class="panel-title">' + escapeHtml(formatPeriod(reportingEndDate)) + '</div><div class="button-row">' + renderChip(form.status) + (ui.drawer.editMode ? '<button class="button small ghost" type="button" data-action="cancel-edit-milestone">Cancel editing</button>' : '<button class="button small" type="button" data-action="toggle-edit-milestone">Edit milestone</button>') + "</div></div>",
+      '      <div class="panel-header"><div class="panel-title">' + escapeHtml(form.name || datapoint.name || getReportingRangeLabel(reportingEndDate)) + '</div><div class="button-row">' + renderChip(form.status) + (ui.drawer.editMode ? '<button class="button small ghost" type="button" data-action="cancel-edit-milestone">Cancel editing</button>' : '<button class="button small" type="button" data-action="toggle-edit-milestone">Edit past performance</button>') + "</div></div>",
       '      <div class="detail-grid">',
       '        <div class="detail-item"><small>Metric</small><strong>' + escapeHtml(metric.name) + "</strong></div>",
       '        <div class="detail-item"><small>Reporting period end</small><strong>' + formatDate(reportingEndDate) + "</strong></div>",
@@ -1410,18 +1713,18 @@
       ui.drawer.editMode
         ? [
             '<div class="form-grid two-up" style="margin-top:16px;">',
-            '<div class="field"><label for="milestone-details-year">Reporting year</label><select id="milestone-details-year" data-drawer-field="reportingYear"><option value="">Select year</option>' + renderYearOptions(form.reportingYear, "milestone") + "</select>" + (ui.drawer.errors.reportingYear ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.reportingYear) + "</div>" : "") + "</div>",
+            '<div class="field"><label for="milestone-details-name">Past performance name</label><input id="milestone-details-name" type="text" data-drawer-field="name" value="' + escapeHtml(form.name) + '" />' + (ui.drawer.errors.name ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.name) + "</div>" : "") + "</div>",
             '<div class="field"><label for="milestone-details-value">Value</label><input id="milestone-details-value" type="number" step="any" data-drawer-field="value" value="' + escapeHtml(form.value) + '" />' + (ui.drawer.errors.value ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.value) + "</div>" : "") + "</div>",
             "</div>",
-            '<div class="form-grid two-up" style="margin-top:14px;"><div class="field"><label>Unit of measure</label><div class="readonly">' + escapeHtml(form.uom) + '</div></div><div class="field"><label>Reporting period</label><div class="readonly">' + escapeHtml(getReportingRangeLabel(reportingEndDate)) + "</div></div></div>"
+            '<div class="form-grid two-up" style="margin-top:14px;"><div class="field"><label for="milestone-details-end-date">Past performance end date</label><input id="milestone-details-end-date" type="date" data-drawer-field="endDate" value="' + escapeHtml(form.endDate) + '" />' + (ui.drawer.errors.endDate ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.endDate) + '</div>' : "") + '</div><div class="field"><label>Unit of measure</label><div class="readonly">' + escapeHtml(form.uom) + "</div></div></div><div class=\"form-grid two-up\" style=\"margin-top:14px;\"><div class=\"field\"><label>Past performance start date</label><div class=\"readonly\">" + escapeHtml(form.endDate ? formatDate(getReportingStartDateInputValue(form.endDate)) : "MM/DD/YYYY") + "</div></div><div class=\"field\"><label>Reporting period</label><div class=\"readonly\">" + escapeHtml(getReportingRangeLabel(reportingEndDate)) + "</div></div></div>"
           ].join("")
         : '<div class="detail-grid" style="margin-top:16px;"><div class="detail-item"><small>Value</small><strong class="mono">' + formatValue(form.value) + " " + escapeHtml(form.uom) + '</strong></div><div class="detail-item"><small>Recorded status</small><strong>' + escapeHtml(form.status) + "</strong></div></div>",
-      '<div class="helper" style="margin-top:14px;">' + escapeHtml(target ? "This milestone belongs to a target pathway." : "This milestone is not associated with a target.") + "</div>",
+      '<div class="helper" style="margin-top:14px;">' + escapeHtml(target ? "This past performance entry belongs to a target pathway." : "This past performance entry is not associated with a target.") + "</div>",
       "    </section>",
-      '    <section class="form-section"><div class="panel-header"><div><div class="panel-title">Milestone status</div><div class="panel-subtitle">Status can be updated here without editing the milestone details.</div></div></div><div class="form-grid two-up"><div class="field"><label for="milestone-details-status">Status</label><select id="milestone-details-status" data-drawer-field="status">' + STATUSES.map(function (status) {
+      '    <section class="form-section"><div class="panel-header"><div><div class="panel-title">Past performance status</div><div class="panel-subtitle">Status can be updated here without editing the past performance details.</div></div></div><div class="form-grid two-up"><div class="field"><label for="milestone-details-status">Status</label><select id="milestone-details-status" data-drawer-field="status">' + STATUSES.map(function (status) {
         return '<option value="' + escapeHtml(status) + '" ' + (status === form.status ? "selected" : "") + ">" + escapeHtml(status) + "</option>";
-      }).join("") + '</select></div><div class="field"><label>Verification</label><div class="readonly">Request verification stays available on this milestone.</div></div></div></section>',
-      '    <div class="drawer-actions"><button class="button ghost" type="button" data-action="close-drawer">Close</button><button class="button" type="button" data-action="save-milestone-status">Save status</button>' + (ui.drawer.editMode ? '<button class="button" type="button" data-action="save-milestone-details">Save changes</button>' : "") + '<button class="button primary" type="button" data-action="request-verification" data-metric-id="' + escapeHtml(metric.id) + '" data-datapoint-id="' + escapeHtml(datapoint.id) + '">Request verification</button></div>',
+      }).join("") + '</select></div><div class="field"><label>Verification</label><div class="readonly">Request verification remains in the existing workflow and is shown here only for reference.</div></div></div></section>',
+      '    <div class="drawer-actions"><button class="button ghost" type="button" data-action="close-drawer">Close</button><button class="button" type="button" data-action="save-milestone-status">Save status</button>' + (ui.drawer.editMode ? '<button class="button" type="button" data-action="save-milestone-details">Save changes</button>' : "") + '<button class="button primary inactive-link" type="button">Request verification</button></div>',
       "  </div>",
       "</aside>"
     ].join("");
@@ -1432,12 +1735,48 @@
     const metric = getMetric(form.metricId);
     const target = getTarget(form.metricId, form.targetId);
     const lockedUom = getTargetDrawerLockedUom();
+    const activeSection = ui.drawer.activeSection || "target";
+    const drawerTitle = target ? "Edit target" : "Create new target";
+    const drawerSubtitle = target
+      ? "Update this target and open the section you want to edit."
+      : "Create another target on this metric, or edit an existing one, without forcing past performance into it.";
 
     return [
       '<div class="drawer-backdrop" data-action="close-drawer"></div>',
       '<aside class="drawer" aria-label="Track Target drawer">',
-      '  <div class="drawer-header"><div><h2 class="drawer-title">Track Target</h2><div class="drawer-subtitle">Create another target on this metric, or edit an existing one, without forcing milestones into it.</div></div><button class="drawer-close" type="button" data-action="close-drawer">×</button></div>',
+      '  <div class="drawer-header"><div><h2 class="drawer-title">' + escapeHtml(drawerTitle) + '</h2><div class="drawer-subtitle">' + escapeHtml(drawerSubtitle) + '</div></div><button class="drawer-close" type="button" data-action="close-drawer">×</button></div>',
       '  <div class="drawer-body">',
+      target ? renderTargetEditorTabs(activeSection) : "",
+      renderTargetEditorSection(metric, target, lockedUom, activeSection),
+      '    <div class="drawer-actions"><button class="button ghost" type="button" data-action="close-drawer">Cancel</button><button class="button primary" type="button" data-action="save-target">' + (target ? "Save target" : "Create target") + "</button></div>",
+      "  </div>",
+      "</aside>"
+    ].join("");
+  }
+
+  function renderTargetEditorTabs(activeSection) {
+    return '<div class="editor-tabs">' + [
+      { id: "target", label: "Target" },
+      { id: "milestone", label: "Past performance" },
+      { id: "interim-target", label: "Interim targets" }
+    ].map(function (section) {
+      return '<button class="editor-tab ' + (section.id === activeSection ? "active" : "") + '" type="button" data-action="set-target-editor-section" data-section="' + escapeHtml(section.id) + '">' + escapeHtml(section.label) + "</button>";
+    }).join("") + "</div>";
+  }
+
+  function renderTargetEditorSection(metric, target, lockedUom, activeSection) {
+    const form = ui.drawer.form;
+
+    if (target) {
+      if (activeSection === "milestone") {
+        return '<section class="form-section"><div class="panel-header"><div><div class="panel-title">Past performance</div><div class="panel-subtitle">Edit the target-specific past performance on this pathway.</div></div></div>' + renderTargetDraftSection("milestone") + "</section>";
+      }
+      if (activeSection === "interim-target") {
+        return '<section class="form-section"><div class="panel-header"><div><div class="panel-title">Interim targets</div><div class="panel-subtitle">Edit the future reporting periods on this pathway.</div></div></div>' + renderTargetDraftSection("interim-target") + "</section>";
+      }
+    }
+
+    return [
       '    <section class="form-section"><div class="form-grid">',
       '<div class="field"><label for="target-metric">Metric</label>' + (
         form.metricId && ui.drawer.metricLocked
@@ -1454,12 +1793,11 @@
               return '<option value="' + escapeHtml(option) + '" ' + (option === form.uom ? "selected" : "") + ">" + escapeHtml(option) + "</option>";
             }).join("") : "") + "</select>"
       ) + '<div class="field-hint">' + escapeHtml(lockedUom ? "Unit is locked because this target already has linked datapoints." : "Different targets on the same metric can use different valid units.") + "</div>" + (ui.drawer.errors.uom ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.uom) + "</div>" : "") + "</div></div>",
-      target ? '<div class="notice info">You are editing one target on this metric. Other targets and headless milestones remain separate.</div>' : "",
+      target ? '<div class="notice info">You are editing one target on this metric. Other targets and independent past performance entries remain separate.</div>' : "",
       "    </div></section>",
-      '    <section class="form-section"><div class="panel-header"><div><div class="panel-title">Pathway setup</div><div class="panel-subtitle">Add target-specific milestones and interim targets as part of target creation.</div></div></div>' + renderTargetDraftSection("milestone") + renderTargetDraftSection("interim-target") + "</section>",
-      '    <div class="drawer-actions"><button class="button ghost" type="button" data-action="close-drawer">Cancel</button><button class="button primary" type="button" data-action="save-target">' + (target ? "Save target" : "Create target") + "</button></div>",
-      "  </div>",
-      "</aside>"
+      target
+        ? ""
+        : '<section class="form-section"><div class="panel-header"><div><div class="panel-title">Pathway setup</div><div class="panel-subtitle">Add target-specific past performance and interim targets as part of target creation.</div></div></div>' + renderTargetDraftSection("milestone") + renderTargetDraftSection("interim-target") + "</section>"
     ].join("");
   }
 
@@ -1474,13 +1812,13 @@
 
     return [
       '<div class="split-section">',
-      '  <div class="panel-header"><div><div class="panel-title">' + (isInterimTarget ? "Interim targets" : "Milestones") + "</div><div class=\"panel-subtitle\">" + escapeHtml(isInterimTarget ? "Interim targets are future reporting periods on this target pathway." : "Milestones are past reporting periods on this target pathway.") + '</div></div><button class="button small" type="button" data-action="start-target-draft" data-mode="' + escapeHtml(mode) + '" ' + (!form.metricId ? "disabled" : "") + ">" + (isInterimTarget ? "Add interim target" : "Add milestone") + "</button></div>",
+      '  <div class="panel-header"><div><div class="panel-title">' + (isInterimTarget ? "Interim targets" : "Past performance") + "</div><div class=\"panel-subtitle\">" + escapeHtml(isInterimTarget ? "Interim targets are future reporting periods on this target pathway." : "Past performance entries are past reporting periods on this target pathway.") + '</div></div><button class="button small" type="button" data-action="start-target-draft" data-mode="' + escapeHtml(mode) + '" ' + (!form.metricId ? "disabled" : "") + ">" + (isInterimTarget ? "Add interim target" : "Add past performance") + "</button></div>",
       rows.length
-        ? '<div class="table-shell"><div class="table-scroll"><table><thead><tr><th>' + (isInterimTarget ? "Interim target name" : "Milestone name") + '</th><th>End date</th><th>Value</th><th>Status</th><th>Action</th></tr></thead><tbody>' + rows.map(function (row) {
+        ? '<div class="table-shell"><div class="table-scroll"><table><thead><tr><th>' + (isInterimTarget ? "Interim target name" : "Past performance name") + '</th><th>End date</th><th>Value</th><th>Status</th><th>Action</th></tr></thead><tbody>' + rows.map(function (row) {
             const isDraft = Boolean(row.mode);
             return "<tr><td>" + escapeHtml(getTargetEntryName(row, mode)) + "</td><td>" + formatDate(row.endDate) + '</td><td class="mono">' + formatValue(row.value) + " " + escapeHtml(row.uom) + "</td><td>" + renderChip(row.status) + "</td><td>" + (isDraft ? '<button class="button textual" type="button" data-action="remove-target-draft" data-draft-id="' + escapeHtml(row.id) + '">Remove</button>' : '<span class="helper">Already linked</span>') + "</td></tr>";
           }).join("") + "</tbody></table></div></div>"
-        : '<div class="empty-state"><strong>No ' + (isInterimTarget ? "interim targets" : "milestones") + " yet</strong>" + (isInterimTarget ? "Add a future reporting year to show where this target is heading before the final end date." : "Add a past reporting year to create a target-specific milestone.") + "</div>",
+        : '<div class="empty-state"><strong>No ' + (isInterimTarget ? "interim targets" : "past performance") + " yet</strong>" + (isInterimTarget ? "Add a future reporting year to show where this target is heading before the final end date." : "Add a past reporting year to create target-specific past performance.") + "</div>",
       ui.drawer.draftEditor && ui.drawer.draftEditor.mode === mode ? renderTargetDraftEditor(mode) : "",
       "</div>"
     ].join("");
@@ -1492,7 +1830,7 @@
 
     return [
       '<div class="form-grid"><div class="form-grid two-up">',
-      '<div class="field"><label for="target-draft-year">Reporting year</label><select id="target-draft-year" data-target-draft-field="reportingYear"><option value="">Select year</option>' + renderYearOptions(editor.reportingYear, mode) + '</select><div class="field-hint">' + escapeHtml(isInterimTarget ? "Future years become interim targets on the target pathway." : "Past years become milestones that can later be requested for verification.") + "</div>" + (ui.drawer.draftErrors.reportingYear ? '<div class="field-error">' + escapeHtml(ui.drawer.draftErrors.reportingYear) + "</div>" : "") + "</div>",
+      '<div class="field"><label for="target-draft-year">Reporting year</label><select id="target-draft-year" data-target-draft-field="reportingYear"><option value="">Select year</option>' + renderYearOptions(editor.reportingYear, mode) + '</select><div class="field-hint">' + escapeHtml(isInterimTarget ? "Future years become interim targets on the target pathway." : "Past years become past performance that can later be requested for verification.") + "</div>" + (ui.drawer.draftErrors.reportingYear ? '<div class="field-error">' + escapeHtml(ui.drawer.draftErrors.reportingYear) + "</div>" : "") + "</div>",
       '<div class="field"><label for="target-draft-value">Value</label><input id="target-draft-value" type="number" step="any" data-target-draft-field="value" value="' + escapeHtml(editor.value) + '" />' + (ui.drawer.draftErrors.value ? '<div class="field-error">' + escapeHtml(ui.drawer.draftErrors.value) + "</div>" : "") + "</div>",
       '</div><div class="form-grid two-up"><div class="field"><label>Unit of measure</label><div class="readonly">' + escapeHtml(getTargetDrawerResolvedUom() || "Choose a target unit first") + "</div>" + (ui.drawer.draftErrors.uom ? '<div class="field-error">' + escapeHtml(ui.drawer.draftErrors.uom) + "</div>" : "") + '</div><div class="field"><label>Status</label>' + (
         isInterimTarget
@@ -1500,7 +1838,7 @@
           : '<select data-target-draft-field="status">' + STATUSES.map(function (status) {
               return '<option value="' + escapeHtml(status) + '" ' + (status === editor.status ? "selected" : "") + ">" + escapeHtml(status) + "</option>";
             }).join("") + "</select>"
-      ) + "</div></div>" + (ui.drawer.draftErrors.metricId ? '<div class="field-error">' + escapeHtml(ui.drawer.draftErrors.metricId) + "</div>" : "") + '<div class="button-row"><button class="button ghost small" type="button" data-action="cancel-target-draft">Cancel</button><button class="button small" type="button" data-action="save-target-draft">' + (isInterimTarget ? "Save interim target" : "Save milestone") + "</button></div></div>"
+      ) + "</div></div>" + (ui.drawer.draftErrors.metricId ? '<div class="field-error">' + escapeHtml(ui.drawer.draftErrors.metricId) + "</div>" : "") + '<div class="button-row"><button class="button ghost small" type="button" data-action="cancel-target-draft">Cancel</button><button class="button small" type="button" data-action="save-target-draft">' + (isInterimTarget ? "Save interim target" : "Save past performance") + "</button></div></div>"
     ].join("");
   }
 
@@ -1514,12 +1852,11 @@
     return [
       '<div class="drawer-backdrop" data-action="close-drawer"></div>',
       '<aside class="drawer" aria-label="Target details drawer">',
-      '  <div class="drawer-header"><div><h2 class="drawer-title">' + escapeHtml(target.name) + '</h2><div class="drawer-subtitle">Category: ' + escapeHtml(metric.categoryLabel) + " | Performance metric: " + escapeHtml(metric.name) + '</div></div><button class="drawer-close" type="button" data-action="close-drawer">×</button></div>',
+      '  <div class="drawer-header"><div><h2 class="drawer-title">' + escapeHtml(target.name) + '</h2><div class="drawer-subtitle">Category: ' + escapeHtml(metric.categoryLabel) + " | Performance metric: " + escapeHtml(metric.name) + '</div></div><div class="drawer-header-actions"><button class="button" type="button" data-action="open-create-target" data-metric-id="' + escapeHtml(metric.id) + '" data-target-id="' + escapeHtml(target.id) + '" data-section="target">Edit target</button><button class="drawer-close" type="button" data-action="close-drawer">×</button></div></div>',
       '  <div class="drawer-body">',
       '    <section class="form-section"><div class="panel-header"><div class="panel-title">Target information</div>' + renderChip(getTargetStatus(metric.id, target.id)) + '</div><div class="detail-grid"><div class="detail-item"><small>Target name</small><strong>' + escapeHtml(target.name) + '</strong></div><div class="detail-item"><small>Target end date</small><strong>' + formatDate(target.endDate) + '</strong></div><div class="detail-item"><small>Target value</small><strong class="mono">' + formatValue(target.value) + " " + escapeHtml(target.uom) + '</strong></div><div class="detail-item"><small>Unit of measure</small><strong>' + escapeHtml(target.uom) + "</strong></div></div></section>",
       renderTargetDetailsSection(metric, target, "milestone"),
       renderTargetDetailsSection(metric, target, "interim-target"),
-      '    <div class="drawer-actions"><button class="button primary" type="button" data-action="open-create-target" data-metric-id="' + escapeHtml(metric.id) + '" data-target-id="' + escapeHtml(target.id) + '">Edit target</button></div>',
       "  </div>",
       "</aside>"
     ].join("");
@@ -1530,17 +1867,17 @@
     const datapoints = isInterimTarget ? getFutureDatapoints(metric.id, target.id) : getPastDatapoints(metric.id, target.id);
 
     return [
-      '<section class="form-section">',
-      '  <div class="panel-header"><div><div class="panel-title">' + (isInterimTarget ? "Interim targets" : "Milestones") + "</div><div class=\"panel-subtitle\">" + escapeHtml(isInterimTarget ? "Interim targets are future reporting periods on this target pathway." : "Milestones are past reporting periods and can be requested for verification.") + '</div></div>' + (
+      '<section class="drawer-section">',
+      '  <div class="panel-header"><div><div class="panel-title">' + (isInterimTarget ? "Interim targets" : "Past performance") + "</div><div class=\"panel-subtitle\">" + escapeHtml(isInterimTarget ? "Interim targets are future reporting periods on this target pathway." : "Past performance entries are past reporting periods and can be requested for verification.") + '</div></div>' + (
         isInterimTarget
-          ? '<button class="button small" type="button" data-action="open-add-interim-target" data-metric-id="' + escapeHtml(metric.id) + '" data-target-id="' + escapeHtml(target.id) + '">Add interim target</button>'
-          : '<button class="button small" type="button" data-action="open-add-milestone" data-metric-id="' + escapeHtml(metric.id) + '" data-target-id="' + escapeHtml(target.id) + '" data-metric-locked="true">Track / Verify Milestone</button>'
+          ? '<button class="button small" type="button" data-action="edit-target-section" data-metric-id="' + escapeHtml(metric.id) + '" data-target-id="' + escapeHtml(target.id) + '" data-section="interim-target">Edit interim targets</button>'
+          : '<button class="button small" type="button" data-action="edit-target-section" data-metric-id="' + escapeHtml(metric.id) + '" data-target-id="' + escapeHtml(target.id) + '" data-section="milestone">Edit past performance</button>'
       ) + "</div>",
       datapoints.length
-        ? '<div class="table-shell"><div class="table-scroll"><table><thead><tr><th>' + (isInterimTarget ? "Interim target name" : "Milestone name") + '</th><th>End date</th><th>Value</th><th>Status</th>' + (isInterimTarget ? "" : "<th>Action</th>") + "</tr></thead><tbody>" + datapoints.map(function (datapoint) {
-            return "<tr><td><button class=\"button textual\" type=\"button\" data-action=\"open-milestone-details\" data-metric-id=\"" + escapeHtml(metric.id) + '" data-datapoint-id="' + escapeHtml(datapoint.id) + '">' + escapeHtml(getTargetEntryName(datapoint, mode)) + "</button></td><td>" + formatDate(datapoint.endDate) + '</td><td class="mono">' + formatValue(datapoint.value) + " " + escapeHtml(datapoint.uom) + "</td><td>" + renderChip(datapoint.status) + "</td>" + (isInterimTarget ? "" : '<td><button class="button textual" type="button" data-action="request-verification" data-metric-id="' + escapeHtml(metric.id) + '" data-datapoint-id="' + escapeHtml(datapoint.id) + '">Request verification</button></td>') + "</tr>";
+        ? '<div class="table-shell"><div class="table-scroll"><table><thead><tr><th>' + (isInterimTarget ? "Interim target name" : "Past performance name") + '</th><th>End date</th><th>Value</th><th>Status</th>' + (isInterimTarget ? "" : "<th>Action</th>") + "</tr></thead><tbody>" + datapoints.map(function (datapoint) {
+            return "<tr><td><button class=\"button textual\" type=\"button\" data-action=\"open-milestone-details\" data-metric-id=\"" + escapeHtml(metric.id) + '" data-datapoint-id="' + escapeHtml(datapoint.id) + '">' + escapeHtml(getTargetEntryName(datapoint, mode)) + "</button></td><td>" + formatDate(datapoint.endDate) + '</td><td class="mono">' + formatValue(datapoint.value) + " " + escapeHtml(datapoint.uom) + "</td><td>" + renderChip(datapoint.status) + "</td>" + (isInterimTarget ? "" : '<td><span class="button textual inactive-link">Request verification</span></td>') + "</tr>";
           }).join("") + "</tbody></table></div></div>"
-        : '<div class="empty-state"><strong>No ' + (isInterimTarget ? "interim targets" : "milestones") + " yet</strong>" + (isInterimTarget ? "Add a future reporting year to show where this target is heading before the final end date." : "Track a past reporting year to create a milestone on this target.") + "</div>",
+        : '<div class="empty-state"><strong>No ' + (isInterimTarget ? "interim targets" : "past performance") + " yet</strong>" + (isInterimTarget ? "Use Edit interim targets to manage the future reporting periods on this target pathway." : "Use Edit past performance to manage the past reporting periods on this target pathway.") + "</div>",
       "</section>"
     ].join("");
   }
@@ -1559,7 +1896,7 @@
     return [
       '<div class="dialog-backdrop"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="verification-title">',
       '<h3 id="verification-title">Request verification</h3>',
-      "<p>You’re about to request verification for this milestone. Evidence upload and payment happen in the verification workflow (not shown in this prototype). Continuing will mark " + escapeHtml(metric.name) + " " + escapeHtml(formatPeriod(datapoint.endDate)) + " as Submitted.</p>",
+      "<p>You’re about to request verification for this past performance entry. Evidence upload and payment happen in the verification workflow (not shown in this prototype). Continuing will mark " + escapeHtml(metric.name) + " " + escapeHtml(formatPeriod(datapoint.endDate)) + " as Submitted.</p>",
       '<div class="dialog-actions"><button class="button ghost" type="button" data-action="close-modal">Cancel</button><button class="button primary" type="button" data-action="confirm-request-verification">Continue</button></div>',
       "</div></div>"
     ].join("");
