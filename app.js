@@ -752,7 +752,7 @@
       errors.uom = "Choose a unit of measure.";
     }
 
-    if (form.endDate) {
+    if (form.endDate && form.targetId) {
       const duplicate = getDatapoints(form.metricId).some(function (datapoint) {
         const sameScope = (datapoint.targetId || null) === (form.targetId || null);
         const sameUom = datapoint.uom === resolvedUom;
@@ -762,6 +762,8 @@
       if (duplicate) {
         errors.endDate = "This reporting period overlaps an existing past performance record in the same scope.";
       }
+    }
+    if (form.endDate) {
       if (isFutureEndDate(endDate)) {
         errors.endDate = "Past performance end dates must be in the past.";
       }
@@ -914,7 +916,7 @@
       errors.status = "Choose the past performance status.";
     }
 
-    if (form.reportingYear) {
+    if (form.reportingYear && form.targetId) {
       const duplicate = getDatapoints(form.metricId).some(function (datapoint) {
         const sameScope = (datapoint.targetId || null) === (form.targetId || null);
         const sameYear = getYear(datapoint.endDate) === year;
@@ -925,6 +927,8 @@
       if (duplicate) {
         errors.reportingYear = "This reporting year already exists for this past performance scope.";
       }
+    }
+    if (form.reportingYear) {
       if (mode === "milestone" && isFutureEndDate(endDate)) {
         errors.reportingYear = "Future-dated entries are interim targets and require a target.";
       }
@@ -1002,7 +1006,7 @@
       errors.value = "Value must be numeric.";
     }
 
-    if (form.endDate) {
+    if (form.endDate && datapoint.targetId) {
       const duplicate = getDatapoints(ui.drawer.metricId).some(function (entry) {
         if (entry.id === ui.drawer.datapointId) {
           return false;
@@ -1015,6 +1019,8 @@
       if (duplicate) {
         errors.endDate = "This reporting period overlaps an existing past performance record in the same scope.";
       }
+    }
+    if (form.endDate) {
       if (isFutureEndDate(endDate)) {
         errors.endDate = "Past performance end dates must be in the past.";
       }
