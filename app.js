@@ -3,6 +3,7 @@
   const DEMO_TODAY = new Date(window.DEMO_DATA.meta.demoToday + "T00:00:00");
   const appEl = document.getElementById("app");
   const STATUSES = ["Draft", "Ready for Review", "Submitted", "Verified", "Rejected"];
+  let shouldRepairPersistedState = false;
 
   let state = loadState();
   let ui = {
@@ -17,6 +18,10 @@
   document.addEventListener("change", handleChange);
   document.addEventListener("input", handleInput);
 
+  if (shouldRepairPersistedState) {
+    persistState();
+  }
+
   if (!window.location.hash) {
     window.location.hash = "#/portfolio/summary";
   } else {
@@ -26,18 +31,46 @@
   function loadState() {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      return normalizeState(raw ? JSON.parse(raw) : clone(window.DEMO_DATA));
+      const parsed = raw ? JSON.parse(raw) : null;
+      const normalizedState = normalizeState(parsed);
+      shouldRepairPersistedState = Boolean(raw) && JSON.stringify(parsed) !== JSON.stringify(normalizedState);
+      return normalizedState;
     } catch (error) {
-      return normalizeState(clone(window.DEMO_DATA));
+      clearPersistedState();
+      shouldRepairPersistedState = false;
+      return normalizeState(null);
     }
   }
 
   function normalizeState(rawState) {
-    const nextState = clone(rawState || window.DEMO_DATA);
-    const metrics = nextState.metrics || [];
+    const defaultState = clone(window.DEMO_DATA);
+    const sourceState = rawState && typeof rawState === "object" ? clone(rawState) : {};
+    const rawTargetsByMetricId = sourceState.targetsByMetricId && typeof sourceState.targetsByMetricId === "object"
+      ? sourceState.targetsByMetricId
+      : {};
+    const rawDatapointsByMetricId = sourceState.datapointsByMetricId && typeof sourceState.datapointsByMetricId === "object"
+      ? sourceState.datapointsByMetricId
+      : {};
+    const metrics = Array.isArray(sourceState.metrics) && sourceState.metrics.length
+      ? sourceState.metrics
+      : defaultState.metrics;
+    const nextState = {
+      ...defaultState,
+      ...sourceState,
+      meta: {
+        ...defaultState.meta,
+        ...(sourceState.meta && typeof sourceState.meta === "object" ? sourceState.meta : {})
+      },
+      categories: Array.isArray(sourceState.categories) && sourceState.categories.length
+        ? sourceState.categories
+        : defaultState.categories,
+      metrics: metrics
+    };
 
     nextState.targetsByMetricId = metrics.reduce((collection, metric) => {
-      const rawTargets = nextState.targetsByMetricId ? nextState.targetsByMetricId[metric.id] : [];
+      const rawTargets = Object.prototype.hasOwnProperty.call(rawTargetsByMetricId, metric.id)
+        ? rawTargetsByMetricId[metric.id]
+        : defaultState.targetsByMetricId[metric.id] || [];
       const targets = Array.isArray(rawTargets) ? rawTargets : rawTargets ? [rawTargets] : [];
 
       collection[metric.id] = targets.map((target, index) => ({
@@ -50,7 +83,10 @@
     }, {});
 
     nextState.datapointsByMetricId = metrics.reduce((collection, metric) => {
-      const datapoints = nextState.datapointsByMetricId ? nextState.datapointsByMetricId[metric.id] || [] : [];
+      const rawDatapoints = Object.prototype.hasOwnProperty.call(rawDatapointsByMetricId, metric.id)
+        ? rawDatapointsByMetricId[metric.id]
+        : defaultState.datapointsByMetricId[metric.id] || [];
+      const datapoints = Array.isArray(rawDatapoints) ? rawDatapoints : [];
       collection[metric.id] = datapoints.map((datapoint, index) => ({
         ...datapoint,
         id: datapoint.id || "dp-" + metric.id + "-" + (index + 1),
@@ -63,39 +99,39 @@
     metrics.forEach((metric) => {
       const metricTargets = nextState.targetsByMetricId[metric.id];
       const datapoints = nextState.datapointsByMetricId[metric.id];
-
-      datapoints.forEach((datapoint) => {
-        if (datapoint.targetId) {
-          return;
+      const legacyHeadlessTargetIds = new Set(metricTargets.filter(function (target) {
+        if (!target || target.lifecycleStatus !== "Draft") {
+          return false;
         }
 
-        const draftTarget = buildDraftTargetRecord(metric.id, {
-          id: "target-draft-" + datapoint.id,
-          endDate: datapoint.endDate,
-          value: datapoint.value,
-          uom: datapoint.uom
+        const linkedDatapoints = datapoints.filter(function (datapoint) {
+          return datapoint.targetId === target.id;
         });
-
-        if (!metricTargets.some((target) => target.id === draftTarget.id)) {
-          metricTargets.push(draftTarget);
+        if (linkedDatapoints.length !== 1) {
+          return false;
         }
 
-        datapoint.targetId = draftTarget.id;
+        const datapoint = linkedDatapoints[0];
+        return !isFutureEndDate(datapoint.endDate) &&
+          datapoint.endDate === target.endDate &&
+          datapoint.uom === target.uom &&
+          Number(datapoint.value) === Number(target.value);
+      }).map(function (target) {
+        return target.id;
+      }));
+
+      if (!legacyHeadlessTargetIds.size) {
+        return;
+      }
+
+      nextState.targetsByMetricId[metric.id] = metricTargets.filter(function (target) {
+        return !legacyHeadlessTargetIds.has(target.id);
       });
-    });
-
-    const renewableTargets = nextState.targetsByMetricId["energy-renewable-energy-use"] || [];
-    renewableTargets.forEach((target) => {
-      if (target.id === "target-draft-dp-energy-2023-headless") {
-        target.name = "2023 Renewables";
-      }
-    });
-
-    const renewableDatapoints = nextState.datapointsByMetricId["energy-renewable-energy-use"] || [];
-    renewableDatapoints.forEach((datapoint) => {
-      if (datapoint.id === "dp-energy-2023-headless") {
-        datapoint.name = "2023 Renewables";
-      }
+      datapoints.forEach(function (datapoint) {
+        if (legacyHeadlessTargetIds.has(datapoint.targetId)) {
+          datapoint.targetId = null;
+        }
+      });
     });
 
     return nextState;
@@ -104,6 +140,14 @@
   function persistState() {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      // Local storage is optional in this prototype.
+    }
+  }
+
+  function clearPersistedState() {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
     } catch (error) {
       // Local storage is optional in this prototype.
     }
@@ -178,10 +222,6 @@
 
   function getDatapointsForTarget(metricId, targetId) {
     return getDatapoints(metricId).filter((datapoint) => datapoint.targetId === targetId);
-  }
-
-  function getHeadlessDatapoints(metricId) {
-    return getDatapoints(metricId).filter((datapoint) => !datapoint.targetId);
   }
 
   function compareByEndDate(left, right) {
@@ -311,7 +351,7 @@
 
   function getAssociatedTargetLabel(metricId, targetId) {
     if (!targetId) {
-      return "Target missing";
+      return "No target";
     }
 
     const target = getTarget(metricId, targetId);
@@ -349,32 +389,6 @@
     }
     const year = getYear(datapoint.endDate);
     return kind === "interim-target" ? "Interim target " + year : "Past performance " + year;
-  }
-
-  function getDraftTargetName(endDateString) {
-    return "draft " + getYear(endDateString);
-  }
-
-  function buildDraftTargetRecord(metricId, config) {
-    return {
-      id: config.id || "target-draft-" + metricId + "-" + Date.now(),
-      metricId: metricId,
-      name: config.name || getDraftTargetName(config.endDate),
-      value: config.value,
-      endDate: config.endDate,
-      uom: config.uom,
-      lifecycleStatus: "Draft"
-    };
-  }
-
-  function createDraftTarget(metricId, config) {
-    if (!state.targetsByMetricId[metricId]) {
-      state.targetsByMetricId[metricId] = [];
-    }
-
-    const draftTarget = buildDraftTargetRecord(metricId, config);
-    state.targetsByMetricId[metricId].push(draftTarget);
-    return draftTarget;
   }
 
   function showToast(message) {
@@ -699,7 +713,7 @@
 
     ui.drawer.form.targetId = targetId || "";
     ui.drawer.associationChosen = true;
-    ui.drawer.associationMode = targetId ? "existing" : "draft";
+    ui.drawer.associationMode = targetId ? "existing" : "none";
     ui.drawer.errors = {};
     syncPastPerformanceDrawerUom();
     render();
@@ -713,7 +727,6 @@
     const form = ui.drawer.form;
     const endDate = form.endDate;
     const value = Number(form.value);
-    const createsDraftTarget = ui.drawer.associationMode === "draft";
     const target = getTarget(form.metricId, form.targetId);
     const resolvedUom = target ? target.uom : form.uom;
     const errors = {};
@@ -739,7 +752,7 @@
       errors.uom = "Choose a unit of measure.";
     }
 
-    if (form.endDate && target) {
+    if (form.endDate) {
       const duplicate = getDatapoints(form.metricId).some(function (datapoint) {
         const sameScope = (datapoint.targetId || null) === (form.targetId || null);
         const sameUom = datapoint.uom === resolvedUom;
@@ -764,21 +777,12 @@
       state.datapointsByMetricId[form.metricId] = [];
     }
 
-    let targetId = form.targetId || "";
-    if (createsDraftTarget && !targetId) {
-      targetId = createDraftTarget(form.metricId, {
-        endDate: endDate,
-        value: value,
-        uom: resolvedUom
-      }).id;
-    }
-
     const datapointId = "dp-" + form.metricId + "-" + Date.now();
 
     state.datapointsByMetricId[form.metricId].push({
       id: datapointId,
       metricId: form.metricId,
-      targetId: targetId || null,
+      targetId: form.targetId || null,
       name: form.name.trim(),
       startDate: getReportingStartDateInputValue(endDate),
       endDate: endDate,
@@ -794,7 +798,7 @@
       ui.modal = {
         type: "documentation",
         metricId: form.metricId,
-        targetId: targetId || null,
+        targetId: form.targetId || null,
         datapointId: datapointId
       };
       render();
@@ -910,7 +914,7 @@
       errors.status = "Choose the past performance status.";
     }
 
-    if (form.reportingYear && form.targetId) {
+    if (form.reportingYear) {
       const duplicate = getDatapoints(form.metricId).some(function (datapoint) {
         const sameScope = (datapoint.targetId || null) === (form.targetId || null);
         const sameYear = getYear(datapoint.endDate) === year;
@@ -939,19 +943,10 @@
       state.datapointsByMetricId[form.metricId] = [];
     }
 
-    let targetId = form.targetId || "";
-    if (mode === "milestone" && !targetId) {
-      targetId = createDraftTarget(form.metricId, {
-        endDate: endDate,
-        value: value,
-        uom: resolvedUom
-      }).id;
-    }
-
     state.datapointsByMetricId[form.metricId].push({
       id: "dp-" + form.metricId + "-" + year + "-" + Date.now(),
       metricId: form.metricId,
-      targetId: targetId || null,
+      targetId: form.targetId || null,
       endDate: endDate,
       value: value,
       uom: resolvedUom,
@@ -1557,7 +1552,7 @@
     if (datapoint.targetId) {
       return escapeHtml(getAssociatedTargetLabel(metricId, datapoint.targetId));
     }
-    return '<span class="muted-value">' + escapeHtml(getDraftTargetName(datapoint.endDate)) + "</span>";
+    return '<span class="muted-value">No target</span>';
   }
 
   function renderDrawer() {
@@ -1824,7 +1819,7 @@
       '        <div class="detail-item"><small>Metric</small><strong>' + escapeHtml(metric.name) + "</strong></div>",
       '        <div class="detail-item"><small>Reporting period end</small><strong>' + formatDate(reportingEndDate) + "</strong></div>",
       '        <div class="detail-item"><small>Reporting period range</small><strong>' + escapeHtml(getReportingRangeLabel(reportingEndDate)) + "</strong></div>",
-      '        <div class="detail-item"><small>Associated target</small><strong>' + escapeHtml(target ? target.name : getDraftTargetName(datapoint.endDate)) + "</strong></div>",
+      '        <div class="detail-item"><small>Associated target</small><strong>' + escapeHtml(target ? target.name : "No target") + "</strong></div>",
       "      </div>",
       ui.drawer.editMode
         ? [
@@ -2044,7 +2039,7 @@
         renderDocumentationSummaryItem("Baseline date", "-") +
         renderDocumentationSummaryItem("Performance change", "-") +
       "</div>",
-      '    <section class="documentation-section"><div class="documentation-section-title">Supporting documentation</div><div class="documentation-supporting-row"><div><small>Supporting documentation</small><strong>' + escapeHtml(title) + '</strong></div><div><small>Interim target value</small><strong>' + formatValue(datapoint.value) + " " + escapeHtml(datapoint.uom) + '</strong></div><div><small>Interim target date</small><strong>' + formatDate(datapoint.endDate) + '</strong></div><div><small>Interim target status</small><strong class="documentation-inline-status">In progress</strong></div></div></section>',
+      '    <section class="documentation-section"><div class="documentation-section-title">Supporting documentation</div><div class="documentation-supporting-row"><div><small>Supporting documentation</small><strong>' + escapeHtml(title) + '</strong></div><div><small>Performance value</small><strong>' + formatValue(datapoint.value) + " " + escapeHtml(datapoint.uom) + '</strong></div><div><small>Performance end date</small><strong>' + formatDate(datapoint.endDate) + '</strong></div><div><small>Performance status</small><strong class="documentation-inline-status">In progress</strong></div></div></section>',
       '    <section class="documentation-section"><div class="documentation-accordion-row open"><span>Portfolio level documentation</span><span class="documentation-pill">Documentation uploaded</span></div><div class="documentation-accordion-body">' +
         renderDocumentationEvidenceBlock("Policies") +
         renderDocumentationEvidenceBlock("Methodology") +

@@ -50,26 +50,7 @@ window.DEMO_DATA = {
     }
   ],
   targetsByMetricId: {
-    "emissions-total-ghg": [
-      {
-        id: "target-draft-dp-ghg-2022",
-        metricId: "emissions-total-ghg",
-        name: "draft 2022",
-        value: 480,
-        uom: "mtCO2e",
-        endDate: "2022-12-31",
-        lifecycleStatus: "Draft"
-      },
-      {
-        id: "target-draft-dp-ghg-2023",
-        metricId: "emissions-total-ghg",
-        name: "draft 2023",
-        value: 452,
-        uom: "mtCO2e",
-        endDate: "2023-12-31",
-        lifecycleStatus: "Draft"
-      }
-    ],
+    "emissions-total-ghg": [],
     "energy-renewable-energy-use": [
       {
         id: "target-energy-public",
@@ -86,15 +67,6 @@ window.DEMO_DATA = {
         value: 120000,
         uom: "MWh",
         endDate: "2029-12-31"
-      },
-      {
-        id: "target-draft-dp-energy-2023-headless",
-        metricId: "energy-renewable-energy-use",
-        name: "2023 Renewables",
-        value: 54,
-        uom: "%",
-        endDate: "2023-12-31",
-        lifecycleStatus: "Draft"
       }
     ],
     "water-use-intensity": [
@@ -105,15 +77,6 @@ window.DEMO_DATA = {
         value: 24,
         uom: "gal/ft²",
         endDate: "2030-12-31"
-      },
-      {
-        id: "target-draft-dp-water-2024-headless",
-        metricId: "water-use-intensity",
-        name: "draft 2024",
-        value: 8.6,
-        uom: "L/m²",
-        endDate: "2024-12-31",
-        lifecycleStatus: "Draft"
       }
     ]
   },
@@ -122,7 +85,7 @@ window.DEMO_DATA = {
       {
         id: "dp-ghg-2022",
         metricId: "emissions-total-ghg",
-        targetId: "target-draft-dp-ghg-2022",
+        targetId: null,
         endDate: "2022-12-31",
         value: 480,
         uom: "mtCO2e",
@@ -131,7 +94,7 @@ window.DEMO_DATA = {
       {
         id: "dp-ghg-2023",
         metricId: "emissions-total-ghg",
-        targetId: "target-draft-dp-ghg-2023",
+        targetId: null,
         endDate: "2023-12-31",
         value: 452,
         uom: "mtCO2e",
@@ -142,7 +105,7 @@ window.DEMO_DATA = {
       {
         id: "dp-energy-2023-headless",
         metricId: "energy-renewable-energy-use",
-        targetId: "target-draft-dp-energy-2023-headless",
+        targetId: null,
         name: "2023 Renewables",
         endDate: "2023-12-31",
         value: 54,
@@ -208,7 +171,7 @@ window.DEMO_DATA = {
       {
         id: "dp-water-2024-headless",
         metricId: "water-use-intensity",
-        targetId: "target-draft-dp-water-2024-headless",
+        targetId: null,
         endDate: "2024-12-31",
         value: 8.6,
         uom: "L/m²",
