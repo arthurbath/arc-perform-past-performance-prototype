@@ -197,9 +197,7 @@ button:disabled {
   font-weight: 700;
 }
 
-.workspace-tabs,
-.category-tabs,
-.metric-pills {
+.workspace-tabs {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -209,8 +207,7 @@ button:disabled {
   margin: 18px 0 14px;
 }
 
-.workspace-tab,
-.metric-pill {
+.workspace-tab {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text-muted);
@@ -224,41 +221,6 @@ button:disabled {
   background: #eef2ff;
   color: var(--info-text);
   border-color: #d4dbf7;
-}
-
-.metric-pill.active {
-  background: #eef2ff;
-  color: var(--info-text);
-  border-color: #d4dbf7;
-}
-
-.category-tabs {
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 10px;
-  gap: 22px;
-  overflow-x: auto;
-}
-
-.category-tab {
-  border: 0;
-  background: transparent;
-  padding: 10px 2px;
-  border-bottom: 2px solid transparent;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.category-tab.active {
-  color: var(--text);
-  border-color: #6fceb5;
-}
-
-.category-tab.disabled {
-  opacity: 0.44;
-  cursor: default;
 }
 
 .page {
@@ -455,7 +417,6 @@ td .button-row {
   opacity: 0.72;
 }
 
-.summary-header,
 .section-header {
   display: flex;
   justify-content: space-between;

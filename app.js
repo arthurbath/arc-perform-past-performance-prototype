@@ -1,6 +1,9 @@
 (function () {
   const STORAGE_KEY = "arc-perform-milestones-prototype-v1";
+  const DEFAULT_METRIC_ID = "energy-renewable-energy-use";
+  const DEFAULT_ROUTE = "#/metric/" + DEFAULT_METRIC_ID;
   const DEMO_TODAY = new Date(window.DEMO_DATA.meta.demoToday + "T00:00:00");
+  const CURRENT_TODAY = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00");
   const appEl = document.getElementById("app");
   const STATUSES = ["Draft", "Ready for Review", "Submitted", "Verified", "Rejected"];
   let shouldRepairPersistedState = false;
@@ -22,8 +25,8 @@
     persistState();
   }
 
-  if (!window.location.hash) {
-    window.location.hash = "#/portfolio/summary";
+  if (!window.location.hash || window.location.hash === "#/portfolio/summary" || getRoute().metricId !== DEFAULT_METRIC_ID) {
+    window.location.hash = DEFAULT_ROUTE;
   } else {
     render();
   }
@@ -51,9 +54,7 @@
     const rawDatapointsByMetricId = sourceState.datapointsByMetricId && typeof sourceState.datapointsByMetricId === "object"
       ? sourceState.datapointsByMetricId
       : {};
-    const metrics = Array.isArray(sourceState.metrics) && sourceState.metrics.length
-      ? sourceState.metrics
-      : defaultState.metrics;
+    const metrics = defaultState.metrics;
     const nextState = {
       ...defaultState,
       ...sourceState,
@@ -61,9 +62,7 @@
         ...defaultState.meta,
         ...(sourceState.meta && typeof sourceState.meta === "object" ? sourceState.meta : {})
       },
-      categories: Array.isArray(sourceState.categories) && sourceState.categories.length
-        ? sourceState.categories
-        : defaultState.categories,
+      categories: defaultState.categories,
       metrics: metrics
     };
 
@@ -77,7 +76,8 @@
         ...target,
         id: target.id || "target-" + metric.id + "-" + (index + 1),
         metricId: metric.id,
-        lifecycleStatus: target.lifecycleStatus || "Active"
+        lifecycleStatus: target.lifecycleStatus || "Active",
+        createdFromNoTarget: Boolean(target.createdFromNoTarget)
       }));
       return collection;
     }, {});
@@ -112,7 +112,8 @@
         }
 
         const datapoint = linkedDatapoints[0];
-        return !isFutureEndDate(datapoint.endDate) &&
+        return !target.createdFromNoTarget &&
+          !isFutureEndDate(datapoint.endDate) &&
           datapoint.endDate === target.endDate &&
           datapoint.uom === target.uom &&
           Number(datapoint.value) === Number(target.value);
@@ -168,23 +169,15 @@
 
   function getRoute() {
     const hash = window.location.hash.replace(/^#/, "");
-    if (!hash || hash === "/portfolio/summary") {
-      return { page: "summary", activeCategory: "summary" };
-    }
-
     if (hash.startsWith("/metric/")) {
       const metricId = hash.split("/")[2];
       const metric = getMetric(metricId);
       if (metric) {
-        return {
-          page: "metric",
-          metricId,
-          activeCategory: metric.category
-        };
+        return { metricId };
       }
     }
 
-    return { page: "summary", activeCategory: "summary" };
+    return { metricId: DEFAULT_METRIC_ID };
   }
 
   function getMetric(metricId) {
@@ -243,15 +236,14 @@
     return getSortedDatapoints(metricId, targetId).filter((datapoint) => isFutureDatapoint(datapoint));
   }
 
-  function getAllPastMilestones() {
-    return state.metrics
-      .flatMap((metric) =>
-        getPastDatapoints(metric.id).map((datapoint) => ({
-          metric,
-          datapoint
-        }))
-      )
-      .sort((left, right) => new Date(right.datapoint.endDate).getTime() - new Date(left.datapoint.endDate).getTime());
+  function getPastDatapointsOnTargets(metricId) {
+    return getPastDatapoints(metricId).filter(function (datapoint) {
+      if (!datapoint.targetId) {
+        return false;
+      }
+      const target = getTarget(metricId, datapoint.targetId);
+      return Boolean(target && !target.createdFromNoTarget);
+    });
   }
 
   function buildEndDateFromYear(year) {
@@ -260,6 +252,10 @@
 
   function isFutureEndDate(endDateString) {
     return new Date(endDateString + "T00:00:00").getTime() > DEMO_TODAY.getTime();
+  }
+
+  function isFutureCalendarDate(endDateString) {
+    return new Date(endDateString + "T00:00:00").getTime() > CURRENT_TODAY.getTime();
   }
 
   function isFutureDatapoint(datapoint) {
@@ -411,7 +407,7 @@
     const action = trigger.dataset.action;
 
     if (action === "navigate") {
-      window.location.hash = trigger.dataset.route || "#/portfolio/summary";
+      window.location.hash = trigger.dataset.route || DEFAULT_ROUTE;
       return;
     }
 
@@ -463,7 +459,22 @@
     }
 
     if (action === "choose-past-performance-association") {
-      choosePastPerformanceAssociation(trigger.dataset.targetId || "");
+      choosePastPerformanceAssociation(trigger.dataset.targetId || "", trigger.dataset.associationMode || "");
+      return;
+    }
+
+    if (action === "back-past-performance-selection") {
+      backPastPerformanceSelection();
+      return;
+    }
+
+    if (action === "open-documentation") {
+      openDocumentationModal(trigger.dataset.metricId, trigger.dataset.targetId || "", trigger.dataset.datapointId);
+      return;
+    }
+
+    if (action === "choose-existing-past-performance") {
+      chooseExistingPastPerformance(trigger.dataset.metricId, trigger.dataset.datapointId);
       return;
     }
 
@@ -639,15 +650,17 @@
   }
 
   function openDatapointDrawer(metricId, mode, targetId, metricLocked) {
-    const target = getTarget(metricId, targetId);
+    const resolvedMetricId = metricId || DEFAULT_METRIC_ID;
+    const resolvedTargetId = targetId || "";
+    const target = getTarget(resolvedMetricId, resolvedTargetId);
     ui.drawer = {
       type: "datapoint",
       mode: mode,
-      metricLocked: Boolean(metricLocked || targetId),
-      targetLocked: Boolean(targetId),
+      metricLocked: true,
+      targetLocked: Boolean(resolvedTargetId),
       form: {
-        metricId: metricId || "",
-        targetId: targetId || "",
+        metricId: resolvedMetricId,
+        targetId: resolvedTargetId,
         reportingYear: "",
         value: "",
         uom: target ? target.uom : "",
@@ -660,14 +673,17 @@
   }
 
   function openPastPerformanceDrawer(metricId, targetId, metricLocked) {
+    const resolvedMetricId = metricId || DEFAULT_METRIC_ID;
+    const resolvedTargetId = targetId || "";
     ui.drawer = {
       type: "past-performance",
-      metricLocked: Boolean(metricLocked || targetId),
-      associationChosen: Boolean(targetId),
-      associationMode: targetId ? "existing" : "",
+      metricLocked: true,
+      associationChosen: Boolean(resolvedTargetId),
+      associationMode: resolvedTargetId ? "existing-target" : "",
+      selectedDatapointId: "",
       form: {
-        metricId: metricId || "",
-        targetId: targetId || "",
+        metricId: resolvedMetricId,
+        targetId: resolvedTargetId,
         name: "",
         endDate: "",
         value: "",
@@ -706,16 +722,68 @@
     }
   }
 
-  function choosePastPerformanceAssociation(targetId) {
+  function choosePastPerformanceAssociation(targetId, associationMode) {
     if (!ui.drawer || ui.drawer.type !== "past-performance") {
       return;
     }
 
     ui.drawer.form.targetId = targetId || "";
     ui.drawer.associationChosen = true;
-    ui.drawer.associationMode = targetId ? "existing" : "none";
+    ui.drawer.associationMode = associationMode || (targetId ? "existing-target" : "draft-target");
+    ui.drawer.selectedDatapointId = "";
     ui.drawer.errors = {};
     syncPastPerformanceDrawerUom();
+    render();
+  }
+
+  function chooseExistingPastPerformance(metricId, datapointId) {
+    if (!ui.drawer || ui.drawer.type !== "past-performance") {
+      return;
+    }
+
+    const datapoint = getDatapoint(metricId, datapointId);
+    if (!datapoint) {
+      return;
+    }
+
+    ui.drawer.associationChosen = true;
+    ui.drawer.associationMode = "existing-datapoint";
+    ui.drawer.selectedDatapointId = datapoint.id;
+    ui.drawer.form.metricId = metricId;
+    ui.drawer.form.targetId = datapoint.targetId || "";
+    ui.drawer.form.name = datapoint.name || getTargetEntryName(datapoint, "interim-target");
+    ui.drawer.form.endDate = datapoint.endDate;
+    ui.drawer.form.value = String(datapoint.value);
+    ui.drawer.form.uom = datapoint.uom;
+    ui.drawer.errors = {};
+    render();
+  }
+
+  function backPastPerformanceSelection() {
+    if (!ui.drawer || ui.drawer.type !== "past-performance") {
+      return;
+    }
+
+    ui.drawer.associationChosen = false;
+    ui.drawer.associationMode = "";
+    ui.drawer.selectedDatapointId = "";
+    ui.drawer.form.targetId = "";
+    ui.drawer.form.name = "";
+    ui.drawer.form.endDate = "";
+    ui.drawer.form.value = "";
+    ui.drawer.form.uom = "";
+    ui.drawer.errors = {};
+    render();
+  }
+
+  function openDocumentationModal(metricId, targetId, datapointId) {
+    ui.drawer = null;
+    ui.modal = {
+      type: "documentation",
+      metricId: metricId,
+      targetId: targetId || null,
+      datapointId: datapointId
+    };
     render();
   }
 
@@ -728,7 +796,11 @@
     const endDate = form.endDate;
     const value = Number(form.value);
     const target = getTarget(form.metricId, form.targetId);
+    const existingDatapoint = ui.drawer.selectedDatapointId
+      ? getDatapoint(form.metricId, ui.drawer.selectedDatapointId)
+      : null;
     const resolvedUom = target ? target.uom : form.uom;
+    const createsDraftTarget = ui.drawer.associationMode === "draft-target";
     const errors = {};
 
     if (!form.metricId) {
@@ -754,6 +826,9 @@
 
     if (form.endDate && form.targetId) {
       const duplicate = getDatapoints(form.metricId).some(function (datapoint) {
+        if (existingDatapoint && datapoint.id === existingDatapoint.id) {
+          return false;
+        }
         const sameScope = (datapoint.targetId || null) === (form.targetId || null);
         const sameUom = datapoint.uom === resolvedUom;
         return sameScope && sameUom && periodsOverlap(datapoint.endDate, endDate);
@@ -764,7 +839,7 @@
       }
     }
     if (form.endDate) {
-      if (isFutureEndDate(endDate)) {
+      if (isFutureCalendarDate(endDate)) {
         errors.endDate = "Past performance end dates must be in the past.";
       }
     }
@@ -779,19 +854,46 @@
       state.datapointsByMetricId[form.metricId] = [];
     }
 
-    const datapointId = "dp-" + form.metricId + "-" + Date.now();
+    let resolvedTargetId = form.targetId || null;
+    if (createsDraftTarget) {
+      if (!state.targetsByMetricId[form.metricId]) {
+        state.targetsByMetricId[form.metricId] = [];
+      }
 
-    state.datapointsByMetricId[form.metricId].push({
-      id: datapointId,
-      metricId: form.metricId,
-      targetId: form.targetId || null,
-      name: form.name.trim(),
-      startDate: getReportingStartDateInputValue(endDate),
-      endDate: endDate,
-      value: value,
-      uom: resolvedUom,
-      status: "Draft"
-    });
+      resolvedTargetId = "target-" + form.metricId + "-draft-" + Date.now();
+      state.targetsByMetricId[form.metricId].push({
+        id: resolvedTargetId,
+        metricId: form.metricId,
+        name: form.name.trim(),
+        value: value,
+        uom: resolvedUom,
+        endDate: endDate,
+        lifecycleStatus: "Draft",
+        createdFromNoTarget: true
+      });
+    }
+
+    const datapointId = existingDatapoint ? existingDatapoint.id : "dp-" + form.metricId + "-" + Date.now();
+    if (existingDatapoint) {
+      existingDatapoint.targetId = resolvedTargetId;
+      existingDatapoint.name = form.name.trim();
+      existingDatapoint.startDate = getReportingStartDateInputValue(endDate);
+      existingDatapoint.endDate = endDate;
+      existingDatapoint.value = value;
+      existingDatapoint.uom = resolvedUom;
+    } else {
+      state.datapointsByMetricId[form.metricId].push({
+        id: datapointId,
+        metricId: form.metricId,
+        targetId: resolvedTargetId,
+        name: form.name.trim(),
+        startDate: getReportingStartDateInputValue(endDate),
+        endDate: endDate,
+        value: value,
+        uom: resolvedUom,
+        status: "Draft"
+      });
+    }
 
     persistState();
 
@@ -800,7 +902,7 @@
       ui.modal = {
         type: "documentation",
         metricId: form.metricId,
-        targetId: form.targetId || null,
+        targetId: resolvedTargetId,
         datapointId: datapointId
       };
       render();
@@ -808,7 +910,7 @@
     }
 
     ui.drawer = null;
-    showToast("Performance saved.");
+    showToast(existingDatapoint ? "Performance updated." : "Performance saved.");
     render();
   }
 
@@ -1021,7 +1123,7 @@
       }
     }
     if (form.endDate) {
-      if (isFutureEndDate(endDate)) {
+      if (isFutureCalendarDate(endDate)) {
         errors.endDate = "Past performance end dates must be in the past.";
       }
     }
@@ -1044,13 +1146,15 @@
   }
 
   function openTargetDrawer(metricId, targetId, metricLocked, activeSection) {
+    const resolvedMetricId = metricId || DEFAULT_METRIC_ID;
+    const resolvedTargetId = targetId || "";
     ui.drawer = {
       type: "target",
-      metricLocked: Boolean(metricLocked || targetId),
+      metricLocked: true,
       activeSection: normalizeTargetDrawerSection(activeSection || "target"),
       form: {
-        metricId: metricId || "",
-        targetId: targetId || "",
+        metricId: resolvedMetricId,
+        targetId: resolvedTargetId,
         targetName: "",
         targetValue: "",
         targetEndDate: "",
@@ -1061,7 +1165,7 @@
       draftEditor: null,
       draftErrors: {}
     };
-    populateTargetDrawer(metricId || "", targetId || "");
+    populateTargetDrawer(resolvedMetricId, resolvedTargetId);
     render();
   }
 
@@ -1375,7 +1479,7 @@
 
   function render() {
     const route = getRoute();
-    const content = route.page === "summary" ? renderSummaryPage() : renderMetricPage(route.metricId);
+    const content = renderMetricPage(route.metricId);
     appEl.innerHTML = renderShell(route, content) + renderDrawer() + renderModal() + renderToast();
   }
 
@@ -1388,9 +1492,6 @@
       '        <h1 class="portfolio-title">' + escapeHtml(state.meta.portfolioName) + "</h1>",
       "      </div>",
       "    </div>",
-      '    <div class="category-tabs">' + state.categories.map(function (category) {
-        return renderCategoryTab(category, route.activeCategory);
-      }).join("") + "</div>",
       '    <section class="page">' + content + '<div class="footer"><button type="button" data-action="reset-demo">Reset demo data</button></div></section>',
       "  </main>",
       "</div>"
@@ -1404,86 +1505,15 @@
     }).join("");
   }
 
-  function renderCategoryTab(category, activeCategory) {
-    if (!category.route || category.id !== "energy") {
-      return '<button class="category-tab disabled" type="button">' + escapeHtml(category.label) + "</button>";
-    }
-
-    return '<button class="category-tab ' + (category.id === activeCategory ? "active" : "") + '" type="button" data-action="navigate" data-route="' + escapeHtml(category.route) + '">' + escapeHtml(category.label) + "</button>";
-  }
-
-  function renderSummaryPage() {
-    const targetRows = state.metrics.flatMap(function (metric) {
-      return getDisplayTargets(metric.id).map(function (target) {
-        return { metric: metric, target: target };
-      });
-    });
-
-    return [
-      '<p class="lead-text">View your performance summary for the category\'s targets.</p>',
-      '<div class="summary-header"><div><h2 class="section-title">Target summary</h2><div class="section-description">Metrics can carry multiple targets, while past performance records stay attached to one performance pathway.</div></div><div class="button-row"><button class="button primary" type="button" data-action="open-create-target">Track Target</button></div></div>',
-      renderTargetSummaryTable(targetRows),
-      '<div class="section-header"><div><h2 class="section-title">Recent past performance</h2><div class="section-description">Past performance can be tracked against an existing target or with no target.</div></div><div class="button-row"><button class="button" type="button" data-action="open-add-milestone">Track past performance</button></div></div>',
-      renderRecentMilestonesTable(getAllPastMilestones())
-    ].join("");
-  }
-
-  function renderTargetSummaryTable(targetRows) {
-    if (!targetRows.length) {
-      return '<div class="table-shell"><div class="empty-state"><strong>No targets yet</strong>Create one or more targets from summary or from a metric page. Past performance can still be tracked with no target in the meantime.</div></div>';
-    }
-
-    return [
-      '<div class="table-shell"><div class="table-scroll"><table>',
-      "<thead><tr><th>Performance metric</th><th>Name</th><th>End date</th><th>Value</th><th>Interim targets</th><th>Status</th></tr></thead>",
-      "<tbody>",
-      targetRows.map(function (row) {
-        const interimTargets = getDatapointsForTarget(row.metric.id, row.target.id);
-        return [
-          "<tr>",
-          '<td><button class="button textual" type="button" data-action="open-target-details" data-metric-id="' + escapeHtml(row.metric.id) + '" data-target-id="' + escapeHtml(row.target.id) + '">' + escapeHtml(row.metric.name) + "</button></td>",
-          "<td>" + escapeHtml(row.target.name) + "</td>",
-          "<td>" + formatDate(row.target.endDate) + "</td>",
-          '<td class="mono">' + formatValue(row.target.value) + " " + escapeHtml(row.target.uom) + "</td>",
-          "<td>" + interimTargets.length + "</td>",
-          "<td>" + renderChip(getTargetStatus(row.metric.id, row.target.id)) + "</td>",
-          "</tr>"
-        ].join("");
-      }).join(""),
-      "</tbody></table></div></div>"
-    ].join("");
-  }
-
-  function renderRecentMilestonesTable(rows) {
-    if (!rows.length) {
-      return '<div class="table-shell"><div class="empty-state"><strong>No past performance yet</strong>Start by tracking a past performance year, then request verification from here or from the metric page.<div class="button-row" style="justify-content:center; margin-top:14px;"><button class="button primary" type="button" data-action="open-add-milestone">Track past performance</button></div></div></div>';
-    }
-
-    return renderDatapointTable(rows[0].metric, rows.map(function (row) {
-      return row.datapoint;
-    }), {
-      mode: "summary",
-      metricByDatapointId: rows.reduce(function (collection, row) {
-        collection[row.datapoint.id] = row.metric;
-        return collection;
-      }, {})
-    });
-  }
-
   function renderMetricPage(metricId) {
-    const metric = getMetric(metricId);
+    const metric = getMetric(metricId) || getMetric(DEFAULT_METRIC_ID);
     if (!metric) {
-      return renderSummaryPage();
+      return "";
     }
 
     return [
       '<div class="metric-layout">',
-      '    <div class="metric-pills">' + state.metrics.filter(function (item) {
-        return item.category === metric.category;
-      }).map(function (item) {
-        return '<button class="metric-pill ' + (item.id === metric.id ? "active" : "") + '" type="button" data-action="navigate" data-route="#/metric/' + escapeHtml(item.id) + '">' + escapeHtml(item.shortLabel) + "</button>";
-      }).join("") + "</div>",
-      '    <section class="flat-section"><div class="section-header"><div><h2 class="section-title">Targets</h2></div><div class="button-row"><button class="button small" type="button" data-action="open-add-milestone" data-metric-id="' + escapeHtml(metric.id) + '">Track and verify performance</button><button class="button small" type="button" data-action="open-create-target" data-metric-id="' + escapeHtml(metric.id) + '">Create new target</button></div></div>' + renderTargetList(metric) + "</section>",
+      '    <section class="flat-section"><div class="section-header"><div><h2 class="section-title">Targets</h2></div><div class="button-row"><button class="button small" type="button" data-action="open-create-target" data-metric-id="' + escapeHtml(metric.id) + '">Create new target</button><button class="button small" type="button" data-action="open-add-milestone" data-metric-id="' + escapeHtml(metric.id) + '">Verify performance</button></div></div>' + renderTargetList(metric) + "</section>",
       "</div>"
     ].join("");
   }
@@ -1519,7 +1549,7 @@
       return '<div class="table-shell"><div class="empty-state"><strong>No past performance recorded</strong>' + (mode === "metric" ? "Track past performance now and attach it to an existing target or leave it with no target." : "Start by tracking a past performance year.") + "</div></div>";
     }
 
-    const showMetricColumn = mode === "summary";
+    const showMetricColumn = false;
     const showNameColumn = mode === "metric";
     const metricByDatapointId = options.metricByDatapointId || {};
 
@@ -1636,8 +1666,10 @@
     const form = ui.drawer.form;
     const metric = getMetric(form.metricId);
     const target = getTarget(form.metricId, form.targetId);
-    const targets = metric ? getTargets(metric.id) : [];
-    const needsMetric = !form.metricId;
+    const targets = metric ? getTargets(metric.id).filter(function (entry) {
+      return !entry.createdFromNoTarget;
+    }) : [];
+    const eligiblePastTargetDatapoints = metric ? getPastDatapointsOnTargets(metric.id) : [];
     const needsAssociation = metric && !ui.drawer.associationChosen;
     const scopeDatapoints = metric && form.targetId ? getDatapointsForTarget(metric.id, form.targetId) : [];
     const subtitle = !metric
@@ -1648,11 +1680,10 @@
 
     return [
       '<div class="drawer-backdrop" data-action="close-drawer"></div>',
-      '<aside class="drawer" aria-label="Track performance drawer">',
-      '  <div class="drawer-header"><div><h2 class="drawer-title">Track Performance</h2><div class="drawer-subtitle">' + escapeHtml(subtitle) + '</div></div><button class="drawer-close" type="button" data-action="close-drawer">×</button></div>',
+      '<aside class="drawer" aria-label="Verify performance drawer">',
+      '  <div class="drawer-header"><div><h2 class="drawer-title">Verify Performance</h2><div class="drawer-subtitle">' + escapeHtml(subtitle) + '</div></div><button class="drawer-close" type="button" data-action="close-drawer">×</button></div>',
       '  <div class="drawer-body">',
-      needsMetric ? renderPastPerformanceMetricSelection() : "",
-      needsAssociation ? renderPastPerformanceAssociationSelection(metric, targets) : "",
+      needsAssociation ? renderPastPerformanceAssociationSelection(metric, targets, eligiblePastTargetDatapoints) : "",
       metric && ui.drawer.associationChosen ? renderPastPerformanceEntrySection(metric, target, !ui.drawer.metricLocked, scopeDatapoints) : "",
       !metric || !ui.drawer.associationChosen ? '    <div class="drawer-actions"><button class="button ghost" type="button" data-action="close-drawer">Cancel</button></div>' : "",
       "  </div>",
@@ -1660,30 +1691,33 @@
     ].join("");
   }
 
-  function renderPastPerformanceMetricSelection() {
+  function renderPastPerformanceAssociationSelection(metric, targets, eligiblePastTargetDatapoints) {
     return [
       '<section class="plain-drawer-section">',
-      '  <div class="panel-header"><div><div class="panel-title">Performance metric</div><div class="panel-subtitle">Choose the metric you want to record performance for.</div></div></div>',
-      '  <div class="form-grid">',
-      '    <div class="field"><label for="past-performance-metric">Metric</label><select id="past-performance-metric" data-drawer-field="metricId"><option value="">Select metric</option>' + state.metrics.map(function (item) {
-        return '<option value="' + escapeHtml(item.id) + '" ' + (item.id === ui.drawer.form.metricId ? "selected" : "") + ">" + escapeHtml(item.name) + "</option>";
-      }).join("") + '</select>' + (ui.drawer.errors.metricId ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.metricId) + "</div>" : "") + "</div>",
-      "  </div>",
-      "</section>"
-    ].join("");
-  }
-
-  function renderPastPerformanceAssociationSelection(metric, targets) {
-    return [
-      '<section class="plain-drawer-section">',
-      '  <div class="panel-header"><div><div class="panel-title">Target association</div><div class="panel-subtitle">Choose whether this performance entry should be tracked against a target or not.</div></div></div>',
+      '  <div class="panel-header"><div><div class="panel-title">Choose a verification path</div><div class="panel-subtitle">Pick one of these three options based on whether you are verifying an existing past interim target or recording a new performance entry.</div></div></div>',
       ui.drawer.errors.targetId ? '<div class="field-error" style="margin-bottom:12px;">' + escapeHtml(ui.drawer.errors.targetId) + "</div>" : "",
-      '  <div class="choice-group"><div class="choice-list">',
-      '    <button class="choice-card" type="button" data-action="choose-past-performance-association" data-target-id=""><strong>No target</strong><span>Use this when you want to track a piece of performance primarily for verification. It can always be turned into a full target later if you decide this performance should be associated with one.</span></button>',
-      '  </div></div>',
-      targets.length ? '<div class="choice-group"><div class="choice-group-label">Existing Targets</div><div class="choice-list">' + targets.map(function (target) {
-        return '<button class="choice-card" type="button" data-action="choose-past-performance-association" data-target-id="' + escapeHtml(target.id) + '"><strong>' + escapeHtml(target.name) + "</strong></button>";
-      }).join("") + "</div></div>" : "",
+      '<div class="choice-group"><div class="choice-group-label">Verify established performance from an existing target</div><div class="choice-list">' + (
+        eligiblePastTargetDatapoints.length
+          ? eligiblePastTargetDatapoints.map(function (datapoint) {
+              const datapointTarget = getTarget(metric.id, datapoint.targetId);
+              const meta = [
+                datapointTarget ? datapointTarget.name : "",
+                formatDate(datapoint.endDate),
+                formatValue(datapoint.value) + " " + datapoint.uom,
+                datapoint.status
+              ].filter(Boolean).join(" | ");
+              return '<button class="choice-card" type="button" data-action="choose-existing-past-performance" data-metric-id="' + escapeHtml(metric.id) + '" data-datapoint-id="' + escapeHtml(datapoint.id) + '"><strong>' + escapeHtml(getTargetEntryName(datapoint, "interim-target")) + '</strong><span>' + escapeHtml(meta) + "</span></button>";
+            }).join("")
+          : '<div class="empty-state compact"><strong>No eligible interim targets</strong>Add or save a past-dated target record first if you want to verify an existing interim target.</div>'
+      ) + '</div></div>',
+      '<div class="choice-group"><div class="choice-group-label">Verify a new performance record against an existing target</div><div class="choice-list">' + (
+        targets.length
+          ? targets.map(function (target) {
+              return '<button class="choice-card" type="button" data-action="choose-past-performance-association" data-association-mode="existing-target" data-target-id="' + escapeHtml(target.id) + '"><strong>' + escapeHtml(target.name) + '</strong></button>';
+            }).join("")
+          : '<div class="empty-state compact"><strong>No existing targets</strong>Create a target first if you want to record performance against one.</div>'
+      ) + '</div></div>',
+      '<div class="choice-group"><div class="choice-group-label">Verify a new performance record that has no target</div><div class="choice-list"><button class="choice-card" type="button" data-action="choose-past-performance-association" data-association-mode="draft-target" data-target-id=""><strong>No target</strong><span>Use this when you just want to verify past performance without setting a target. You can always set a target for this performance record later.</span></button></div></div>',
       "</section>"
     ].join("");
   }
@@ -1691,10 +1725,21 @@
   function renderPastPerformanceEntrySection(metric, target, showAssociationChange, scopeDatapoints) {
     const form = ui.drawer.form;
     const resolvedStartDate = form.endDate ? getReportingStartDateInputValue(form.endDate) : "";
+    const isExistingDatapoint = ui.drawer.associationMode === "existing-datapoint";
+    const sectionTitle = isExistingDatapoint
+      ? "Verify established performance from an existing target"
+      : target
+        ? "New performance record on an existing target"
+        : "New performance record with no target";
+    const sectionSubtitle = isExistingDatapoint
+      ? "Review the established performance details, make any needed updates, then save and verify."
+      : target
+        ? "Track a new past-dated performance record on this target pathway."
+        : "Track a past-dated performance record with no target.";
 
     return [
       '<section class="plain-drawer-section entry-flow-section">',
-      '  <div class="panel-header"><div><div class="panel-title">Performance</div><div class="panel-subtitle">' + escapeHtml(target ? "Add a reporting period on this target pathway." : "track past performance for record-keeping or verification.") + "</div></div></div>",
+      '  <div class="panel-header"><div><div class="panel-title">' + escapeHtml(sectionTitle) + '</div><div class="panel-subtitle">' + escapeHtml(sectionSubtitle) + "</div></div></div>",
       '  <div class="form-grid">',
       '<div class="field"><label for="past-performance-name">Performance name*</label><input id="past-performance-name" type="text" placeholder="Name" data-drawer-field="name" value="' + escapeHtml(form.name) + '" />' + (ui.drawer.errors.name ? '<div class="field-error">' + escapeHtml(ui.drawer.errors.name) + "</div>" : "") + "</div>",
       [
@@ -1712,7 +1757,7 @@
       "</div>",
       '<div class="entry-divider"></div>',
       '<div class="entry-subsection"><div class="entry-subsection-title">Financial details (optional)</div><button class="entry-link" type="button">Add financial details</button></div>',
-      '<div class="drawer-actions"><button class="button ghost" type="button" data-action="close-drawer">Cancel</button><button class="button" type="button" data-action="save-past-performance-exit">Save and exit</button><button class="button primary" type="button" data-action="save-past-performance-verify">Save and verify</button></div>',
+      '<div class="drawer-actions"><button class="button ghost" type="button" data-action="back-past-performance-selection">Back</button><button class="button" type="button" data-action="save-past-performance-exit">Save and exit</button><button class="button primary" type="button" data-action="save-past-performance-verify">Save and verify</button></div>',
       "</section>"
     ].join("");
   }
