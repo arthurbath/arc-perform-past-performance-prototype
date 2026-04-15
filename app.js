@@ -1435,18 +1435,16 @@
 
     return [
       '<div class="table-shell"><div class="table-scroll"><table>',
-      "<thead><tr><th>Performance metric</th><th>Name</th><th>End date</th><th>Value</th><th>Past performance</th><th>Interim targets</th><th>Status</th></tr></thead>",
+      "<thead><tr><th>Performance metric</th><th>Name</th><th>End date</th><th>Value</th><th>Interim targets</th><th>Status</th></tr></thead>",
       "<tbody>",
       targetRows.map(function (row) {
-        const milestones = getPastDatapoints(row.metric.id, row.target.id);
-        const interimTargets = getFutureDatapoints(row.metric.id, row.target.id);
+        const interimTargets = getDatapointsForTarget(row.metric.id, row.target.id);
         return [
           "<tr>",
           '<td><button class="button textual" type="button" data-action="open-target-details" data-metric-id="' + escapeHtml(row.metric.id) + '" data-target-id="' + escapeHtml(row.target.id) + '">' + escapeHtml(row.metric.name) + "</button></td>",
           "<td>" + escapeHtml(row.target.name) + "</td>",
           "<td>" + formatDate(row.target.endDate) + "</td>",
           '<td class="mono">' + formatValue(row.target.value) + " " + escapeHtml(row.target.uom) + "</td>",
-          "<td>" + milestones.length + "</td>",
           "<td>" + interimTargets.length + "</td>",
           "<td>" + renderChip(getTargetStatus(row.metric.id, row.target.id)) + "</td>",
           "</tr>"
@@ -1498,7 +1496,7 @@
 
     return [
       '<div class="table-shell"><div class="table-scroll"><table>',
-      "<thead><tr><th>Name</th><th>End date</th><th>Value</th><th>Past performance</th><th>Interim targets</th><th>Status</th></tr></thead>",
+      "<thead><tr><th>Name</th><th>End date</th><th>Value</th><th>Interim targets</th><th>Status</th></tr></thead>",
       "<tbody>",
       targets.map(function (target) {
         return [
@@ -1506,8 +1504,7 @@
           '<td><button class="button textual" type="button" data-action="open-target-details" data-metric-id="' + escapeHtml(metric.id) + '" data-target-id="' + escapeHtml(target.id) + '">' + escapeHtml(target.name) + "</button></td>",
           "<td>" + formatDate(target.endDate) + "</td>",
           '<td class="mono">' + formatValue(target.value) + " " + escapeHtml(target.uom) + "</td>",
-          "<td>" + getPastDatapoints(metric.id, target.id).length + "</td>",
-          "<td>" + getFutureDatapoints(metric.id, target.id).length + "</td>",
+          "<td>" + getDatapointsForTarget(metric.id, target.id).length + "</td>",
           "<td>" + renderChip(getTargetStatus(metric.id, target.id)) + "</td>",
           "</tr>"
         ].join("");
